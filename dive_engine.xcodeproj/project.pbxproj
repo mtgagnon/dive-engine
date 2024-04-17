@@ -295,7 +295,6 @@
 		E78D6CB92B6F58CB006AE422 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		E78D6CBB2B6F58D0006AE422 /* SceneDB.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SceneDB.cpp; sourceTree = "<group>"; };
 		E7A630642B72D6F700132C47 /* Engine.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Engine.cpp; sourceTree = "<group>"; };
-		E7DF3ABA2B741FE400727F7A /* game_engine.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = game_engine.entitlements; sourceTree = "<group>"; };
 		E7E719732B9D8D3B00DB7737 /* basic.scene */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = basic.scene; sourceTree = "<group>"; };
 		E7E719742B9D8D3B00DB7737 /* rendering.config */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = rendering.config; sourceTree = "<group>"; };
 		E7E719762B9D8D3B00DB7737 /* enemy.template */ = {isa = PBXFileReference; explicitFileType = text.json; fileEncoding = 4; path = enemy.template; sourceTree = "<group>"; };
@@ -326,7 +325,6 @@
 				E7E719712B9D8D3B00DB7737 /* resources */,
 				E76157922B97DB5100F23F7B /* Lua */,
 				E7DF3ABB2B742FB200727F7A /* Frameworks */,
-				E7DF3ABA2B741FE400727F7A /* game_engine.entitlements */,
 				E7A630692B72D78000132C47 /* sourceFiles */,
 				E773CB262B61CE830015ABD7 /* HeaderFiles */,
 				E773CB252B61CE830015ABD7 /* external */,

@@ -22,7 +22,7 @@
 using std::cout, std::cin, std::string, std::endl, glm::vec2, std::filesystem::exists;
 
 /// Constructor!
-Engine::Engine() {
+Engine::Engine() {    
     // check for files
     if(!exists("resources")) {
         cout << "error: resources/ missing";
