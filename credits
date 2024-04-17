@@ -1,0 +1,19 @@
+SceneData used code from GPT:
+        actors.emplace_back(
+                actorData.HasMember("name") ? actorData["name"].GetString() : "",
+                actorData.HasMember("view") ? actorData["view"].GetString()[0] : '?',
+                glm::ivec2(
+                    actorData.HasMember("position") ? actorData["position"]["x"].GetInt() : 0,
+                    actorData.HasMember("position") ? actorData["position"]["y"].GetInt() : 0
+                ),
+                glm::ivec2(
+                    actorData.HasMember("velocity") ? actorData["velocity"]["x"].GetInt() : 0,
+                    actorData.HasMember("velocity") ? actorData["velocity"]["y"].GetInt() : 0
+                ),
+                actorData.HasMember("blocking") ? actorData["blocking"].GetBool() : false,
+                actorData.HasMember("nearby_dialogue") ? actorData["nearby_dialogue"].GetString() : "",
+                actorData.HasMember("contact_dialogue") ? actorData["contact_dialogue"].GetString() : ""
+        );
+
+
+AudioManager.h and .cpp made with the help of chatGPT
