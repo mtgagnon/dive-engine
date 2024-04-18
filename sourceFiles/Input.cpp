@@ -55,15 +55,15 @@ void Input::ProcessEvent(const SDL_Event &e) {
             just_became_up_scancodes.push_back(e.key.keysym.scancode);
             break;
         case SDL_CONTROLLERBUTTONDOWN:
-            controller_button_states[e.cbutton.button] = INPUT_STATE_JUST_BECAME_DOWN;
-            controllers_just_down_buttons.push_back(e.cbutton.button);
+            controller_button_states[e.cdevice.which][e.cbutton.button] = INPUT_STATE_JUST_BECAME_DOWN;
+            controllers_just_down_buttons.push_back({e.cdevice.which, e.cbutton.button});
             break;
         case SDL_CONTROLLERBUTTONUP:
-            controller_button_states[e.cbutton.button] = INPUT_STATE_JUST_BECAME_UP;
-            controllers_just_up_buttons.push_back(e.button.button);
+            controller_button_states[e.cdevice.which][e.cbutton.button] = INPUT_STATE_JUST_BECAME_UP;
+            controllers_just_up_buttons.push_back({e.cdevice.which, e.cbutton.button});
             break;
         case SDL_CONTROLLERAXISMOTION:
-            controller_axis_states[e.caxis.axis] = e.caxis.value;
+            controller_axis_states[e.cdevice.which][e.caxis.axis] = e.caxis.value;
             break;
         case SDL_CONTROLLERDEVICEADDED:
             AddController(e.cdevice.which);
@@ -91,12 +91,20 @@ void Input::LateUpdate() {
         mouse_button_states[button] = (mouse_button_states[button] == INPUT_STATE_JUST_BECAME_UP) ? INPUT_STATE_UP : mouse_button_states[button];
     }
     
-    for(auto button : controllers_just_down_buttons) {
-        controller_button_states[button] = (controller_button_states[button] == INPUT_STATE_JUST_BECAME_DOWN) ? INPUT_STATE_DOWN : controller_button_states[button];
+    for(auto pair : controllers_just_down_buttons) {
+        int id = pair.first;
+        int button = pair.second;
+        INPUT_STATE state = controller_button_states[id][button];
+        
+        controller_button_states[id][button] = (state == INPUT_STATE_JUST_BECAME_DOWN) ? INPUT_STATE_DOWN : state;
     }
     
-    for(auto button : controllers_just_up_buttons) {
-        controller_button_states[button] = (controller_button_states[button] == INPUT_STATE_JUST_BECAME_UP) ? INPUT_STATE_UP : controller_button_states[button];
+    for(auto pair : controllers_just_up_buttons) {
+        int id = pair.first;
+        int button = pair.second;
+        INPUT_STATE state = controller_button_states[id][button];
+        
+        controller_button_states[id][button] = (state == INPUT_STATE_JUST_BECAME_UP) ? INPUT_STATE_UP : state;
     }
     
     mouse_scroll_this_frame = 0;
@@ -110,29 +118,66 @@ void Input::LateUpdate() {
 }
 
 
-//----------------------- CONTROLLERS BUTTONS ---------------------------
-bool Input::GetControllerButton(std::string keycode) {
-    auto it = controller_button_states.find(GetControllerButtonFromLuaKey(keycode));
-    return it != controller_button_states.end() && (it->second == INPUT_STATE_JUST_BECAME_DOWN || it->second == INPUT_STATE_DOWN);
-}
-
-bool Input::GetControllerButtonDown(std::string keycode) {
-    auto it = controller_button_states.find(GetControllerButtonFromLuaKey(keycode));
-    return it != controller_button_states.end() && it->second == INPUT_STATE_JUST_BECAME_DOWN;
-}
-
-bool Input::GetControllerButtonUp(std::string keycode) {
-    auto it = controller_button_states.find(GetControllerButtonFromLuaKey(keycode));
-    return it != controller_button_states.end() && it->second == INPUT_STATE_JUST_BECAME_UP;
-}
-
-float Input::GetControllerAxis(std::string axisName) {
-    SDL_GameControllerAxis axis = GetControllerAxisFromLuaKey(axisName);
-    auto it = controller_axis_states.find(axis);
-    if(axis == SDL_CONTROLLER_AXIS_LEFTY || axis == SDL_CONTROLLER_AXIS_RIGHTY) {
-        return (it == controller_axis_states.end()) ? 0.0f : std::round(-it->second/32768.0f * 1000.0f)/1000.f;
+//------------------------ CONTROLLERS BUTTONS ---------------------------//
+bool Input::GetControllerButton(int controller_id, std::string keycode) {
+    auto it = controller_button_states.find(controller_id);
+    
+    if(it != controller_button_states.end()) {
+        int button = GetControllerButtonFromLuaKey(keycode);
+        auto button_state = it->second.find(button);
+        
+        return button_state != it->second.end() && (button_state->second == INPUT_STATE_JUST_BECAME_DOWN || button_state->second == INPUT_STATE_DOWN);
     } else {
-        return (it == controller_axis_states.end()) ? 0.0f : std::round(it->second/32768.0f * 1000.0f)/1000.f;
+        return false;
+    }
+}
+
+bool Input::GetControllerButtonDown(int controller_id, std::string keycode) {
+    auto it = controller_button_states.find(controller_id);
+    
+    if(it != controller_button_states.end()) {
+        int button = GetControllerButtonFromLuaKey(keycode);
+        auto button_state = it->second.find(button);
+        
+        return button_state != it->second.end() && (button_state->second == INPUT_STATE_JUST_BECAME_DOWN);
+    } else {
+        return false;
+    }
+}
+
+bool Input::GetControllerButtonUp(int controller_id, std::string keycode) {
+    auto it = controller_button_states.find(controller_id);
+    
+    if(it != controller_button_states.end()) {
+        int button = GetControllerButtonFromLuaKey(keycode);
+        auto button_state = it->second.find(button);
+        
+        return button_state != it->second.end() && (button_state->second == INPUT_STATE_JUST_BECAME_UP);
+    } else {
+        return false;
+    }
+}
+
+float Input::GetControllerAxis(int controller_id, std::string axisName) {
+    auto controller = controller_axis_states.find(controller_id);
+    
+    if(controller != controller_axis_states.end()) {
+        SDL_GameControllerAxis axis = GetControllerAxisFromLuaKey(axisName);
+        auto it = controller->second.find(axis);
+        
+        float input = 0.0f;
+        if(axis == SDL_CONTROLLER_AXIS_LEFTY || axis == SDL_CONTROLLER_AXIS_RIGHTY) {
+            input = (it == controller->second.end()) ? 0.0f : std::round(-it->second/32768.0f * 1000.0f)/1000.f;
+        } else {
+            input = (it == controller->second.end()) ? 0.0f : std::round(it->second/32768.0f * 1000.0f)/1000.f;
+        }
+        
+        input = (input < 0.3f && input > -0.3f) ? 0.0f : input;
+        
+        return input;
+        
+    } else {
+        return 0.0f;
     }
 }
 

@@ -18,7 +18,16 @@
 #include <vector>
 #include <string>
 
-enum INPUT_STATE { INPUT_STATE_UP, INPUT_STATE_JUST_BECAME_DOWN, INPUT_STATE_DOWN, INPUT_STATE_JUST_BECAME_UP };
+enum INPUT_STATE {
+    INPUT_STATE_UP,
+    INPUT_STATE_JUST_BECAME_DOWN,
+    INPUT_STATE_DOWN,
+    INPUT_STATE_JUST_BECAME_UP
+};
+
+struct Controller {
+    
+};
 
 class Input {
 public:
@@ -32,10 +41,10 @@ public:
     static bool GetKeyDown(std::string keycode);
     static bool GetKeyUp(std::string keycode);
     
-    static bool GetControllerButton(std::string buttonName);
-    static bool GetControllerButtonDown(std::string buttonName);
-    static bool GetControllerButtonUp(std::string buttonName);
-    static float GetControllerAxis(std::string axisName);
+    static bool GetControllerButton(int controller_id, std::string keycode);
+    static bool GetControllerButtonDown(int controller_id, std::string keycode);
+    static bool GetControllerButtonUp(int controller_id, std::string keycode);
+    static float GetControllerAxis(int controller_id, std::string keycode);
     
     static glm::vec2 GetMousePosition();
 
@@ -57,11 +66,11 @@ private:
     static inline std::vector<SDL_Scancode> just_became_down_scancodes;
     static inline std::vector<SDL_Scancode> just_became_up_scancodes;
 
-    static inline std::unordered_map<int, INPUT_STATE> controller_button_states;
-    static inline std::unordered_map<int, float> controller_axis_states;
     static inline std::map<int, SDL_GameController*> controllers;  // Handles to open controllers
-    static inline std::vector<int> controllers_just_down_buttons;
-    static inline std::vector<int> controllers_just_up_buttons;
+    static inline std::unordered_map<int, std::unordered_map<int, INPUT_STATE>> controller_button_states; // controller id to (SDL_GameControllerButton, input_state)
+    static inline std::unordered_map<int, std::unordered_map<int, float>> controller_axis_states; // controller id to (SDL_GameControllerAxis, float)
+    static inline std::vector<std::pair<int, int>> controllers_just_down_buttons; // controller id to button
+    static inline std::vector<std::pair<int, int>> controllers_just_up_buttons; // controller id to button
     
     static inline glm::vec2 mouse_position;
     static inline std::unordered_map<int, INPUT_STATE> mouse_button_states;
