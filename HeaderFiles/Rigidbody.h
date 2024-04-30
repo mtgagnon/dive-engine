@@ -27,6 +27,7 @@ public:
     RigidBody(const rapidjson::Value &componentEntry, Actor* actor);
     RigidBody(Actor* actor);
     
+    
     void OnStart();
     void OnDestroy();
     

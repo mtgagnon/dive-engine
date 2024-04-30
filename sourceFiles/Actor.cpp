@@ -292,7 +292,7 @@ void Actor::OnDestroy() {
     for(auto it : components_requiring_on_destroy) {
         Component* component = it.second;
 
-        if (component->instance.isTable()) { // Make sure the LuaRef is a table
+        if (true) { // Make sure the LuaRef is a table
             luabridge::LuaRef OnDestroy = (component->instance)["OnDestroy"];
             
             try {
