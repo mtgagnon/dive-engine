@@ -58,7 +58,7 @@ void EventBus::PushChangesToSubList() {
     
     for(auto unsub_list : event_subs_to_unsub) {
         std::string event_type = unsub_list.first;
-        std::list subscription_list = event_subs[event_type];
+        std::list<Subscription> subscription_list = event_subs[event_type];
         for(auto sub_to_remove : unsub_list.second) {
             subscription_list.erase(sub_to_remove);
         }

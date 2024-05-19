@@ -55,7 +55,7 @@ option(BUILD_SHARED_LIBS "Build the library as a shared library" ON)
 # Save BUILD_SHARED_LIBS variable as soon as possible
 set(SDL2MIXER_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 
-option(SDL2MIXER_INSTALL "Enable SDL2mixer install target" ON)
+option(SDL2MIXER_INSTALL "Enable SDL2mixer install target" OFF) #DEBUG
 option(SDL2MIXER_DEPS_SHARED "Default value for loading dependencies dynamically" ON)
 option(SDL2MIXER_VENDORED "Use vendored third-party libraries" ${vendored_default})
 
@@ -76,7 +76,8 @@ cmake_dependent_option(SDL2MIXER_FLAC_LIBFLAC_SHARED "Dynamically load LIBFLAC" 
 
 cmake_dependent_option(SDL2MIXER_FLAC_DRFLAC "Enable FLAC music using drflac" ON SDL2MIXER_FLAC OFF)
 
-option(SDL2MIXER_MOD "Support loading MOD music" ON)
+# MTGAGNON CUSTOM CHANGE TURNED OFF MOD MUSIC SUPPORT
+option(SDL2MIXER_MOD "Support loading MOD music" OFF)
 
 cmake_dependent_option(SDL2MIXER_MOD_MODPLUG "Support loading MOD music via modplug" ON SDL2MIXER_MOD OFF)
 cmake_dependent_option(SDL2MIXER_MOD_MODPLUG_SHARED "Dynamically load modplug" "${SDL2MIXER_DEPS_SHARED}" SDL2MIXER_MOD_MODPLUG OFF)

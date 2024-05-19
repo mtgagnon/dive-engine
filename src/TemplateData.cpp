@@ -15,7 +15,7 @@
 #include "ComponentDB.h"
 #include "Rigidbody.h"
 
-using std::cout, std::endl, std::filesystem::exists, glm::ivec2;
+using std::cout, std::endl, std::__fs::filesystem::exists, glm::ivec2;
 
 void TemplateData::loadTemplate(const std::string& templateName, std::shared_ptr<Actor> child_actor) {
     std::string path = "resources/actor_templates/";

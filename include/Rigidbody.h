@@ -12,7 +12,8 @@
 #include <stdio.h>
 
 #include "lua.hpp"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
+//#include "LuaBridge.h"
 #include "ComponentDB.h"
 #include "box2d/box2d.h"
 #include "rapidjson/document.h"

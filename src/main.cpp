@@ -17,7 +17,7 @@
 using std::cout, std::cin, std::string;
 
 int main(int argc, char* argv[]){
-            
+    
     Engine engine;
     engine.game_loop();
     

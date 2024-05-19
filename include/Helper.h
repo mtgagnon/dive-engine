@@ -27,7 +27,8 @@
  /* Here is the instructor solution folder structure (if we make $(ProjectDir) a include directory, these paths are valid. */
  /* https://bit.ly/3OClfHc */
 
-#include "SDL2_image/SDL_image.h"
+#include "SDL_image.h"
+//#include "SDL2_image/SDL_image.h"
 #include "SDL2/SDL.h"
 
 enum InputStatus { NOT_INITIALIZED, INPUT_FILE_MISSING, INPUT_FILE_PRESENT };
@@ -110,9 +111,9 @@ public:
             if (!initialized)
             {
                 /* Check for existence of frames folder and establish it if necessary. */
-                if (!std::filesystem::exists(frame_directory_relative_path))
+                if (!std::__fs::filesystem::exists(frame_directory_relative_path))
                 {
-                    std::filesystem::create_directory(frame_directory_relative_path);
+                    std::__fs::filesystem::create_directory(frame_directory_relative_path);
                 }
 
                 /* Create reusable surface. */
@@ -358,7 +359,7 @@ private:
         if (IsAutograderMode())
             _autograder_mode = true;
 
-        if (!std::filesystem::exists(USER_INPUT_FILENAME))
+        if (!std::__fs::filesystem::exists(USER_INPUT_FILENAME))
         {
             input_status = INPUT_FILE_MISSING;
             return;

@@ -15,7 +15,7 @@
 #include "TemplateData.h"
 #include "Rigidbody.h"
 #include "lua.h"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
 
 using std::string;
 

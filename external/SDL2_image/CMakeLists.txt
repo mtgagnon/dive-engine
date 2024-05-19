@@ -46,7 +46,7 @@ include(GNUInstallDirs)
 option(CMAKE_POSITION_INDEPENDENT_CODE "Build static libraries with -fPIC" ON)
 option(BUILD_SHARED_LIBS "Build the library as a shared library" ON)
 
-option(SDL2IMAGE_INSTALL "Enable SDL2_image install target" ON)
+option(SDL2IMAGE_INSTALL "Enable SDL2_image install target" OFF) # DEBUG
 option(SDL2IMAGE_DEPS_SHARED "Load dependencies dynamically" ON)
 option(SDL2IMAGE_VENDORED "Use vendored third-party libraries" ${vendored_default})
 
@@ -155,6 +155,7 @@ if(SDL2IMAGE_BUILD_SHARED_LIBS)
     set(sdl2_image_install_name_infix shared)
     set(sdl2_target_name SDL2::SDL2)
 else()
+    message(STATUS "SDL2 Image is building static")
     set(sdl2_image_export_name SDL2_image-static)
     set(sdl2_image_install_name_infix static)
     set(sdl2_target_name SDL2::SDL2-static)

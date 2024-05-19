@@ -15,10 +15,10 @@
 #include "EngineUtils.h"
 #include "rapidjson/document.h"
 #include "SDL2/SDL.h"
-#include "SDL2_image/SDL_image.h"
+#include "SDL_image.h"
 #include "glm/glm.hpp"
 
-using std::filesystem::exists, std::string, std::cout;
+using std::__fs::filesystem::exists, std::string, std::cout;
 
 void Renderer::initialize(const std::string &game_title) {
     

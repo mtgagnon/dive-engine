@@ -7,7 +7,7 @@
 
 #include "ComponentDB.h"
 #include "lua.hpp"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
 #include "Actor.h"
 #include "SceneDB.h"
 #include "Helper.h"
@@ -16,6 +16,7 @@
 #include "AudioManager.h"
 #include "SceneDB.h"
 #include "box2d/box2d.h"
+#include "box2d/b2_math.h"
 #include "Rigidbody.h"
 #include "CollisionManager.h"
 #include "Raycast.h"
@@ -25,9 +26,13 @@
 #include <iostream>
 #include <filesystem>
 
-using std::filesystem::exists;
+using std::__fs::filesystem::exists;
 
 void ComponentDB::initComponentDB() {
+    
+    b2Vec2 vec = b2Vec2(0,0);
+    vec.Normalize();
+    
     if(!lua_state) {
         lua_state = luaL_newstate();
         luaL_openlibs(lua_state);

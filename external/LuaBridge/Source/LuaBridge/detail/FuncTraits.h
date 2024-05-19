@@ -250,6 +250,158 @@ struct Caller<ReturnType, 9>
     }
 };
 
+// Add to of FuncTraits.h (within luabridge)
+// Place just below the struct "struct Caller<ReturnType, 9>"
+// As a result of doing so, luabridge can now support additional parameters in lua functions.
+
+template<class ReturnType>
+struct Caller<ReturnType, 10>
+{
+    template<class Fn, class Params>
+    static ReturnType f(Fn& fn, TypeListValues<Params>& tvl)
+    {
+        return fn(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+
+    template<class T, class MemFn, class Params>
+    static ReturnType f(T* obj, MemFn& fn, TypeListValues<Params>& tvl)
+    {
+        return (obj->*fn)(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+};
+
+template<class ReturnType>
+struct Caller<ReturnType, 11>
+{
+    template<class Fn, class Params>
+    static ReturnType f(Fn& fn, TypeListValues<Params>& tvl)
+    {
+        return fn(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+
+    template<class T, class MemFn, class Params>
+    static ReturnType f(T* obj, MemFn& fn, TypeListValues<Params>& tvl)
+    {
+        return (obj->*fn)(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+};
+
+template<class ReturnType>
+struct Caller<ReturnType, 12>
+{
+    template<class Fn, class Params>
+    static ReturnType f(Fn& fn, TypeListValues<Params>& tvl)
+    {
+        return fn(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+
+    template<class T, class MemFn, class Params>
+    static ReturnType f(T* obj, MemFn& fn, TypeListValues<Params>& tvl)
+    {
+        return (obj->*fn)(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+};
+
+template<class ReturnType>
+struct Caller<ReturnType, 13>
+{
+    template<class Fn, class Params>
+    static ReturnType f(Fn& fn, TypeListValues<Params>& tvl)
+    {
+        return fn(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+
+    template<class T, class MemFn, class Params>
+    static ReturnType f(T* obj, MemFn& fn, TypeListValues<Params>& tvl)
+    {
+        return (obj->*fn)(tvl.hd,
+            tvl.tl.hd,
+            tvl.tl.tl.hd,
+            tvl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd,
+            tvl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.tl.hd);
+    }
+};
+
 template<class ReturnType, class Fn, class Params>
 ReturnType doCall(Fn& fn, TypeListValues<Params>& tvl)
 {

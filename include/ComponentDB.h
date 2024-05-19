@@ -13,7 +13,7 @@
 #include <string>
 
 #include "lua.hpp"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
 
 class ComponentDB {
 public:

@@ -48,7 +48,7 @@ option(CMAKE_POSITION_INDEPENDENT_CODE "Build static libraries with -fPIC" ON)
 option(BUILD_SHARED_LIBS "Build the library as a shared library" ON)
 
 option(SDL2TTF_SAMPLES "Build the SDL2_ttf sample program(s)" ON)
-option(SDL2TTF_INSTALL "Enable SDL2_ttf install target" ON)
+option(SDL2TTF_INSTALL "Enable SDL2_ttf install target" OFF) # DEBUG
 option(SDL2TTF_VENDORED "Use vendored third-party libraries" ${vendored_default})
 
 # For style consistency, create a SDL2TTF_FREETYPE CMake variable. This variable is NOT configurable.

@@ -14,7 +14,7 @@
 #include <list>
 
 #include "lua.hpp"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
 #include "ComponentDB.h"
 
 #endif /* EVENTBUS_H */

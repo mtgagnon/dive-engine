@@ -12,7 +12,7 @@
 #include "glm/glm.hpp"
 #include "ComponentDB.h"
 #include "lua.hpp"
-#include "LuaBridge.h"
+#include "LuaBridge/LuaBridge.h"
 #include "CollisionManager.h"
 
 class Collision; // need to forward declare
