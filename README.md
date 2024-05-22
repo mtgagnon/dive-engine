@@ -9,7 +9,7 @@ Setting up the project:
        use a folder called build!
     
     3. Once in the build folder run the cmake command to build using my CMakeLists.txt, 
-        for my setup to make an XCode project I use this command: cmake -G "Xcode" ..
+       for my setup to make an XCode project I use this command: cmake -G "Xcode" ..
     
     4. Open up your project! Make sure your working directory is where your resources folder
        is or it won't find your resources folder!
