@@ -1,4 +1,4 @@
-#Dive Engine
+# Dive Engine
 
 This project uses CMake to build the project on your machine so making it should be fairly simple!
 Setting up the project: 
