@@ -15,7 +15,7 @@ endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-cmake_dependent_option(LUABRIDGE_TESTING "Build tests" ON
+cmake_dependent_option(LUABRIDGE_TESTING "Build tests" OFF
     "CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF
 )
 
@@ -33,11 +33,11 @@ if(LUABRIDGE_TESTING)
     add_subdirectory(Tests)
 endif()
 
-add_custom_target(Documentation SOURCES
-    .github/workflows/cmake.yml
-    CHANGES.md
-    README.md
-    Doxyfile
-    index.html
-    Manual.html
-)
+# add_custom_target(Documentation SOURCES
+#     .github/workflows/cmake.yml
+#     CHANGES.md
+#     README.md
+#     Doxyfile
+#     index.html
+#     Manual.html
+# )
