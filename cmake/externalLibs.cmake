@@ -9,6 +9,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/external/glm")
 add_subdirectory("${CMAKE_SOURCE_DIR}/external/LuaBridge")
 add_subdirectory("${CMAKE_SOURCE_DIR}/external/rapidjson")
 add_subdirectory("${CMAKE_SOURCE_DIR}/external/lua")
+add_subdirectory("${CMAKE_SOURCE_DIR}/external/glew/build/cmake")
 
 # SDL Libraries
 message(STATUS "Adding SDL2")
@@ -36,4 +37,5 @@ target_link_libraries("${PROJECT_NAME}"
     "glm::glm"             # Assuming glm target is named as such
     "LuaBridge"            # Assuming LuaBridge target is named as such
     "lua"
+    "glew_s"
 )

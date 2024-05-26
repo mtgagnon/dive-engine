@@ -70,7 +70,7 @@ void Renderer::initialize(const std::string &game_title) {
         exit(0);
     }
     
-    window = Helper::SDL_CreateWindow498(game_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_resolution, y_resolution, SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow(game_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_resolution, y_resolution, SDL_WINDOW_SHOWN);
 
     if(!window) {
         std::cerr << "Window could not be created! SDL Error: " << SDL_GetError() << std::endl;
@@ -78,7 +78,7 @@ void Renderer::initialize(const std::string &game_title) {
         return;
     }
     
-    renderer = Helper::SDL_CreateRenderer498(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     SDL_RenderSetScale(renderer, zoom_factor, zoom_factor);
 
 }
@@ -101,11 +101,11 @@ void Renderer::raveMode() {
         SDL_RenderClear(renderer);
 
         SDL_Event event;
-        while(Helper::SDL_PollEvent498(&event)) {
+        while(SDL_PollEvent(&event)) {
              epilepsy = event.type != SDL_QUIT;
         }
         
-        Helper::SDL_RenderPresent498(renderer);
+        SDL_RenderPresent(renderer);
     }
 }
 
@@ -115,7 +115,7 @@ void Renderer::clearFrame() {
 }
 
 void Renderer::showFrame() {
-    Helper::SDL_RenderPresent498(renderer);
+    SDL_RenderPresent(renderer);
 }
 
 
@@ -262,7 +262,7 @@ void Renderer::renderAndClearUIQueue() {
 
         // Perform Draw
         SDL_Point pivot_point = {0, 0};
-        Helper::SDL_RenderCopyEx498(0, "", renderer, tex, NULL, &tex_rect, 0, &pivot_point, SDL_FLIP_NONE);
+        SDL_RenderCopyEx(renderer, tex, NULL, &tex_rect, 0, &pivot_point, SDL_FLIP_NONE);
 
         // Remove tint / alpha from texture
         SDL_SetTextureColorMod(tex, 255, 255, 255);
@@ -314,7 +314,7 @@ void Renderer::renderAndClearImgQueue()
         SDL_SetTextureAlphaMod(tex, request.a);
 
         // Perform Draw
-        Helper::SDL_RenderCopyEx498(0, "", renderer, tex, NULL, &tex_rect, request.rotation_degrees, &pivot_point, static_cast<SDL_RendererFlip>(flip_mode));
+        SDL_RenderCopyEx(renderer, tex, NULL, &tex_rect, request.rotation_degrees, &pivot_point, static_cast<SDL_RendererFlip>(flip_mode));
 
         SDL_RenderSetScale(renderer, zoom_factor, zoom_factor);
 

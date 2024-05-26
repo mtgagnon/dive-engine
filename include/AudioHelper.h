@@ -128,21 +128,21 @@ class AudioHelper {
 };
 
 /* Prevent students from using the default Mix-related functions. */
-#define Mix_LoadWAV Please_use_Mix_LoadWAV498_instead
-#define Mix_OpenAudio Please_use_Mix_OpenAudio498_instead
-#define Mix_AllocateChannels Please_use_Mix_AllocateChannels498_instead
-#define Mix_PlayChannel Please_use_Mix_PlayChannel498_instead
-#define Mix_Pause Please_use_Mix_Pause498_instead
-#define Mix_Resume Please_use_Mix_Resume498_instead
-#define Mix_HaltChannel Please_use_Mix_HaltChannel498_instead
-#define Mix_Volume Please_use_Mix_Volume498_instead
-#define Mx_CloseAudio Please_use_Mix_CloseAudio498_instead
-
-#define Mix_LoadMUS function_not_allowed_on_assignment
-#define Mix_PlayMusic function_not_allowed_on_assignment
-#define Mix_VolumeMusic function_not_allowed_on_assignment
-#define Mix_HaltMusic function_not_allowed_on_assignment
-#define Mix_PauseMusic function_not_allowed_on_assignment
-#define Mix_ResumeMusic function_not_allowed_on_assignment
+//#define Mix_LoadWAV Please_use_Mix_LoadWAV498_instead
+//#define Mix_OpenAudio Please_use_Mix_OpenAudio498_instead
+//#define Mix_AllocateChannels Please_use_Mix_AllocateChannels498_instead
+//#define Mix_PlayChannel Please_use_Mix_PlayChannel498_instead
+//#define Mix_Pause Please_use_Mix_Pause498_instead
+//#define Mix_Resume Please_use_Mix_Resume498_instead
+//#define Mix_HaltChannel Please_use_Mix_HaltChannel498_instead
+//#define Mix_Volume Please_use_Mix_Volume498_instead
+//#define Mx_CloseAudio Please_use_Mix_CloseAudio498_instead
+//
+//#define Mix_LoadMUS function_not_allowed_on_assignment
+//#define Mix_PlayMusic function_not_allowed_on_assignment
+//#define Mix_VolumeMusic function_not_allowed_on_assignment
+//#define Mix_HaltMusic function_not_allowed_on_assignment
+//#define Mix_PauseMusic function_not_allowed_on_assignment
+//#define Mix_ResumeMusic function_not_allowed_on_assignment
 
 #endif

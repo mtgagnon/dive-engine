@@ -100,7 +100,7 @@ void Engine::game_loop() {
 */
 void Engine::input() {
     SDL_Event event;
-    while(Helper::SDL_PollEvent498(&event)) {
+    while(SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
                 isRunning = false;
