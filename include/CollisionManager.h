@@ -1,6 +1,6 @@
 //
 //  CollisionManager.h
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 3/26/24.
 //

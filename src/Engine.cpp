@@ -1,6 +1,6 @@
 //
 //  Engine.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 1/24/24.
 //
@@ -18,6 +18,7 @@
 #include "EngineUtils.h"
 #include "Rigidbody.h"
 #include "EventBus.h"
+#include "Renderer.h"
 
 using std::cout, std::cin, std::string, std::endl, glm::vec2, std::__fs::filesystem::exists;
 
@@ -100,7 +101,7 @@ void Engine::game_loop() {
 */
 void Engine::input() {
     SDL_Event event;
-    while(Helper::SDL_PollEvent498(&event)) {
+    while(SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
                 isRunning = false;

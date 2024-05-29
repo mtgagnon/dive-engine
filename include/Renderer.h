@@ -1,6 +1,6 @@
 //
 //  Renderer.h
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 2/7/24.
 //
@@ -85,13 +85,7 @@ public:
     static void showFrame();
     
     static void clearFrame();
-    
-    static void raveMode();
-    
-    static bool isVisible(glm::ivec2 dimensions, glm::ivec2 pos); // returns true if actor will be shown on screen
-    
-    static SDL_RendererFlip GetRendererFlip(bool horizontalFlip, bool verticalFlip);
-    
+                
     static void DrawText(std::string str_content, int x, int y, std::string font_name, int font_size, int r, int g, int b, int a) {
         text_requests.push({str_content, font_name, x, y, font_size, r, g, b, a});
     }
@@ -106,6 +100,7 @@ public:
     
     static void DrawPixel(float x, float y, float r, float g, float b, float a);
     
+    static int GetFrameNumber() {return frame_number;};
     
     // camera functions
     static void setCameraPosition(float x, float y);
@@ -132,6 +127,8 @@ private:
     
     static void renderHUD(const std::string &hp_image, TTF_Font* font, int health, int score);
     
+    static void SDL_Delay();
+    
     inline static std::unordered_map<std::string, SDL_Texture*> textures;
     
     inline static SDL_Window* window = nullptr;
@@ -148,6 +145,9 @@ private:
     inline static glm::vec2 camera_pos = {0, 0}; // using renderer coordinate system. up = neg, down = pos
     inline static float zoom_factor = 1;    
     inline static int clear_color_r = 255, clear_color_g = 255, clear_color_b = 255;
+
+    inline static int frame_number = 0;
+    inline static Uint32 current_frame_start_timestamp = 0;
 
 };
 

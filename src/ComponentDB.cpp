@@ -1,6 +1,6 @@
 //
 //  ComponentDB.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 3/8/24.
 //
@@ -21,6 +21,7 @@
 #include "CollisionManager.h"
 #include "Raycast.h"
 #include "EventBus.h"
+#include "Renderer.h"
 
 #include <thread>
 #include <iostream>
@@ -259,7 +260,7 @@ void ComponentDB::sleep(int milliseconds) {
 }
 
 int ComponentDB::getFrame() { 
-    return Helper::GetFrameNumber();
+    return Renderer::GetFrameNumber();
 }
 
 void ComponentDB::openURL(std::string url) { 

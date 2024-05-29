@@ -1,6 +1,6 @@
 //
 //  ComponentDB.h
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 3/8/24.
 //

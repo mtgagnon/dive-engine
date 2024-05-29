@@ -28,7 +28,7 @@ file(GLOB_RECURSE MY_HEADERS "include/*.h" "include/*.hpp")
 add_executable("${PROJECT_NAME}" ${MY_SOURCES} ${MY_HEADERS})
 
 # set C++ version for target
-target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_11)
+target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 
 # Specify the include directories
 target_include_directories("${PROJECT_NAME}" PRIVATE
@@ -42,3 +42,6 @@ target_include_directories("${PROJECT_NAME}" PRIVATE
 # )
 
 include("cmake/externalLibs.cmake")
+
+# need to still include the glew library headers I guess
+target_include_directories("${PROJECT_NAME}" PRIVATE "${PROJECT_SOURCE_DIR}/external/glew/include")

@@ -454,10 +454,10 @@ private:
 
 /* Disable usage of several non-wrapped, vanilla SDL functions via the macro redefinition technique. */
 /* By forcing usage of "wrapper" / "helper" functions, the course staff gains control of program needed for autograder. */
-#define SDL_CreateWindow DO_NOT_USE_VANILLA_SDL_CreateWindow_USE_HELPER_SDL_CreateWindow498_Instead
-#define SDL_CreateRenderer DO_NOT_USE_VANILLA_SDL_CreateRenderer_USE_HELPER_SDL_CreateRenderer498_INSTEAD
-#define SDL_PollEvent DO_NOT_USE_SDL_PollEvent_DIRECTLY_USE_HELPER_SDL_PollEvent498_INSTEAD
-#define SDL_RenderPresent DO_NOT_USE_VANILLA_SDL_RenderPresent_USE_HELPER_SDL_RenderPresent498_INSTEAD
-#define SDL_RenderCopyEx DO_NOT_USE_VANILLA_SDL_RenderCopyEx_USE_HELPER_SDL_RenderCopyEx498_INSTEAD
+//#define SDL_CreateWindow DO_NOT_USE_VANILLA_SDL_CreateWindow_USE_HELPER_SDL_CreateWindow498_Instead
+//#define SDL_CreateRenderer DO_NOT_USE_VANILLA_SDL_CreateRenderer_USE_HELPER_SDL_CreateRenderer498_INSTEAD
+//#define SDL_PollEvent DO_NOT_USE_SDL_PollEvent_DIRECTLY_USE_HELPER_SDL_PollEvent498_INSTEAD
+//#define SDL_RenderPresent DO_NOT_USE_VANILLA_SDL_RenderPresent_USE_HELPER_SDL_RenderPresent498_INSTEAD
+//#define SDL_RenderCopyEx DO_NOT_USE_VANILLA_SDL_RenderCopyEx_USE_HELPER_SDL_RenderCopyEx498_INSTEAD
 
 #endif

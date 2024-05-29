@@ -1,6 +1,6 @@
 //
 //  AudioManager.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 2/12/24.
 //
@@ -13,18 +13,18 @@
 
 void AudioManager::initialize() {
     // Initialize SDL_mixer
-    if (AudioHelper::Mix_OpenAudio498(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
         std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError();
         exit(0);
     }
     
-    AudioHelper::Mix_AllocateChannels498(50);
+    Mix_AllocateChannels(50);
 }
 
 void AudioManager::play(int channel, const std::string& sound_name, bool loop) {
     Mix_Chunk* sound = loadSound(sound_name);
     if (sound) {
-        AudioHelper::Mix_PlayChannel498(channel, sound, (loop) ? -1 : 0);
+        Mix_PlayChannel(channel, sound, (loop) ? -1 : 0);
     } else {
         std::cout << "error: failed to play audio clip " << sound_name;
         exit(0);
@@ -44,7 +44,7 @@ Mix_Chunk* AudioManager::loadSound(const std::string& soundName) {
     // Check which file exists and load it
     std::string path = std::__fs::filesystem::exists(wavPath) ? wavPath : (std::__fs::filesystem::exists(oggPath) ? oggPath : "");
     if (!path.empty()) {
-        Mix_Chunk* chunk = AudioHelper::Mix_LoadWAV498(path.c_str());
+        Mix_Chunk* chunk = Mix_LoadWAV(path.c_str());
         if (chunk) {
             soundMap[soundName] = chunk;
             return chunk;
@@ -55,12 +55,12 @@ Mix_Chunk* AudioManager::loadSound(const std::string& soundName) {
 }
 
 void AudioManager::halt(int channel) { 
-    AudioHelper::Mix_HaltChannel498(channel); // Halt all channels
+    Mix_HaltChannel(channel); // Halt all channels
 }
 
 void AudioManager::setVolume(int channel, float volume) { 
     
-    AudioHelper::Mix_Volume498(channel, volume);
+    Mix_Volume(channel, volume);
 }
 
 
