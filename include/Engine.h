@@ -1,6 +1,6 @@
 //
 //  Engine.h
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 1/24/24.
 //
@@ -33,7 +33,7 @@ public:
     Engine();
     
     void game_loop();
-        
+            
     static inline bool newScene = false; // necessary for knowing when to restart game loop
 
 private:
@@ -51,6 +51,7 @@ private:
     void render();
     
     void updateCamera();
+    
     
     TTF_Font* text_font = nullptr;    
     SceneDB cur_scene;

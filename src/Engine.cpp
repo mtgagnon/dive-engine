@@ -1,6 +1,6 @@
 //
 //  Engine.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 1/24/24.
 //
@@ -18,6 +18,7 @@
 #include "EngineUtils.h"
 #include "Rigidbody.h"
 #include "EventBus.h"
+#include "Renderer.h"
 
 using std::cout, std::cin, std::string, std::endl, glm::vec2, std::__fs::filesystem::exists;
 

@@ -1,6 +1,6 @@
 //
 //  Renderer.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 2/7/24.
 //
@@ -84,31 +84,6 @@ void Renderer::initialize(const std::string &game_title) {
 }
 
 
-void Renderer::raveMode() {
-    bool epilepsy = true;
-    double count = 0;
-    const double speed = 0.03; // Speed of color change
-    
-    while (epilepsy) {
-        // Color cycling
-        int r = static_cast<Uint8>((sin(speed * count + 0) * 127) + 128); // Red component
-        int g = static_cast<Uint8>((sin(speed * count + 2 * M_PI / 3) * 127) + 128); // Green component
-        int b = static_cast<Uint8>((sin(speed * count + 4 * M_PI / 3) * 127) + 128); // Blue component
-        count += 1; // Increment for the next frame
-    
-        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-
-        SDL_RenderClear(renderer);
-
-        SDL_Event event;
-        while(SDL_PollEvent(&event)) {
-             epilepsy = event.type != SDL_QUIT;
-        }
-        
-        SDL_RenderPresent(renderer);
-    }
-}
-
 void Renderer::clearFrame() {
     SDL_SetRenderDrawColor(renderer, clear_color_r, clear_color_g, clear_color_b, 255);
     SDL_RenderClear(renderer);
@@ -116,6 +91,10 @@ void Renderer::clearFrame() {
 
 void Renderer::showFrame() {
     SDL_RenderPresent(renderer);
+    
+    // aim for 60fps
+    SDL_Delay();
+    frame_number++;
 }
 
 
@@ -221,27 +200,6 @@ void Renderer::renderText(TTF_Font *font, const TextDrawRequest request) {
 
 }
 
-
-//
-//bool Renderer::isVisible(glm::ivec2 dimensions, glm::ivec2 pos) {
-//    
-//    
-//    // going to add double just for rounding errors
-//    int left = x - pix_width;
-//    int right = x + pix_width;
-//    int top = y - pix_height;
-//    int bottom = y + pix_height;
-//
-//    // Check if any part of actor is onscreen
-//    // using AABB for collision essentially.
-//    // round up in case of odd numbers
-//    bool isVisibleHorizontally = (right >= 0 && left <= x_resolution/zoom);
-//    bool isVisibleVertically = (bottom >= 0 && top <= y_resolution/zoom);
-//
-//    return isVisibleHorizontally && isVisibleVertically;
-//}
-//
-//
 
 void Renderer::renderAndClearUIQueue() {
     std::stable_sort(ui_requests.begin(), ui_requests.end(), UIDrawRequest::compare);
@@ -357,3 +315,18 @@ void Renderer::setCameraPosition(float x, float y) {
 //    camera_pos.y = y;
     camera_pos = glm::vec2(x,y);
 }
+
+void Renderer::SDL_Delay() {
+
+    Uint32 current_frame_end_timestamp = SDL_GetTicks();  // Record end time of the frame
+    Uint32 current_frame_duration_milliseconds = current_frame_end_timestamp - current_frame_start_timestamp;
+    Uint32 desired_frame_duration_milliseconds = 16;
+
+    int delay_ticks = std::max(static_cast<int>(desired_frame_duration_milliseconds) - static_cast<int>(current_frame_duration_milliseconds), 1);
+
+    ::SDL_Delay(delay_ticks);
+
+
+    current_frame_start_timestamp = SDL_GetTicks();  // Record start time of the frame
+}
+

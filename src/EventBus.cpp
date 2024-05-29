@@ -1,6 +1,6 @@
 //
 //  EventBus.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 3/28/24.
 //  Current implementation has it if you don't us=nsubscribe a component and then destroy it,

@@ -1,6 +1,6 @@
 //
 //  SceneData.cpp
-//  game_engine
+//  dive_engine
 //
 //  Created by Mathurin Gagnon on 2/1/24.
 //
