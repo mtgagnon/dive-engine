@@ -12,7 +12,7 @@
 #include "SceneDB.h"
 #include "Helper.h"
 #include "Input.h"
-#include "Renderer.h"
+#include "SDLRenderer.h"
 #include "AudioManager.h"
 #include "SceneDB.h"
 #include "box2d/box2d.h"
@@ -21,7 +21,6 @@
 #include "CollisionManager.h"
 #include "Raycast.h"
 #include "EventBus.h"
-#include "Renderer.h"
 
 #include <thread>
 #include <iostream>
@@ -117,26 +116,26 @@ void ComponentDB::initComponentDB() {
         
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Text")
-                .addFunction("Draw", Renderer::DrawText)
+                .addFunction("Draw", SDLRenderer::DrawText)
             .endNamespace();
         
         
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Image")
-                .addFunction("DrawUI", Renderer::DrawUI)
-                .addFunction("DrawUIEx", Renderer::DrawUIEx)
-                .addFunction("Draw", Renderer::DrawImg)
-                .addFunction("DrawEx", Renderer::DrawImgEx)
-                .addFunction("DrawPixel", Renderer::DrawPixel)
+                .addFunction("DrawUI", SDLRenderer::DrawUI)
+                .addFunction("DrawUIEx", SDLRenderer::DrawUIEx)
+                .addFunction("Draw", SDLRenderer::DrawImg)
+                .addFunction("DrawEx", SDLRenderer::DrawImgEx)
+                .addFunction("DrawPixel", SDLRenderer::DrawPixel)
             .endNamespace();
         
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Camera")
-                .addFunction("SetPosition", Renderer::setCameraPosition)
-                .addFunction("GetPositionX", Renderer::getCameraPositionX)
-                .addFunction("GetPositionY", Renderer::getCameraPositionY)
-                .addFunction("SetZoom", Renderer::setZoom)
-                .addFunction("GetZoom", Renderer::getZoom)
+                .addFunction("SetPosition", SDLRenderer::setCameraPosition)
+                .addFunction("GetPositionX", SDLRenderer::getCameraPositionX)
+                .addFunction("GetPositionY", SDLRenderer::getCameraPositionY)
+                .addFunction("SetZoom", SDLRenderer::setZoom)
+                .addFunction("GetZoom", SDLRenderer::getZoom)
             .endNamespace();
         
         luabridge::getGlobalNamespace(lua_state)
@@ -260,7 +259,7 @@ void ComponentDB::sleep(int milliseconds) {
 }
 
 int ComponentDB::getFrame() { 
-    return Renderer::GetFrameNumber();
+    return SDLRenderer::GetFrameNumber();
 }
 
 void ComponentDB::openURL(std::string url) { 

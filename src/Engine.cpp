@@ -18,7 +18,7 @@
 #include "EngineUtils.h"
 #include "Rigidbody.h"
 #include "EventBus.h"
-#include "Renderer.h"
+#include "SDLRenderer.h"
 
 using std::cout, std::cin, std::string, std::endl, glm::vec2, std::__fs::filesystem::exists;
 
@@ -51,7 +51,7 @@ void Engine::initialize() {
         game_title = config["game_title"].GetString();
     }
     
-    Renderer::initialize(game_title);
+    SDLRenderer::initialize(game_title);
     AudioManager::initialize();
     Input::initialize();
     
@@ -78,7 +78,7 @@ void Engine::game_loop() {
             newScene = false;
         }
         
-        Renderer::clearFrame();
+        SDLRenderer::clearFrame();
         
         input();
         
@@ -88,8 +88,8 @@ void Engine::game_loop() {
 
         RigidBody::physicsStep();
         
-        Renderer::renderFrame();
-        Renderer::showFrame();
+        SDLRenderer::renderFrame();
+        SDLRenderer::showFrame();
         Input::LateUpdate();
     }
     

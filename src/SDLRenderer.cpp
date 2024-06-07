@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <cmath>
 
-#include "Renderer.h"
+#include "SDLRenderer.h"
 #include "ComponentDB.h"
 #include "Helper.h"
 #include "EngineUtils.h"
@@ -20,7 +20,7 @@
 
 using std::__fs::filesystem::exists, std::string, std::cout;
 
-void Renderer::initialize(const std::string &game_title) {
+void SDLRenderer::initialize(const std::string &game_title) {
     
     // defaul display settings
     x_resolution = 640;
@@ -59,7 +59,7 @@ void Renderer::initialize(const std::string &game_title) {
     }
     
     
-    //INITIALIZE
+    //INITIALIZE WINDOW
     if(SDL_Init(SDL_INIT_VIDEO)) {
         std::cout << "SDL could not initialize! SDL_ERROR: " << SDL_GetError() << std::endl;
         exit(0);
@@ -84,12 +84,12 @@ void Renderer::initialize(const std::string &game_title) {
 }
 
 
-void Renderer::clearFrame() {
+void SDLRenderer::clearFrame() {
     SDL_SetRenderDrawColor(renderer, clear_color_r, clear_color_g, clear_color_b, 255);
     SDL_RenderClear(renderer);
 }
 
-void Renderer::showFrame() {
+void SDLRenderer::showFrame() {
     SDL_RenderPresent(renderer);
     
     // aim for 60fps
@@ -98,7 +98,7 @@ void Renderer::showFrame() {
 }
 
 
-SDL_Texture* Renderer::loadImage(const std::string &imgName) {
+SDL_Texture* SDLRenderer::loadImage(const std::string &imgName) {
     auto it = textures.find(imgName);
     
     if(it == textures.end()) {
@@ -120,7 +120,7 @@ SDL_Texture* Renderer::loadImage(const std::string &imgName) {
 }
 
 
-TTF_Font* Renderer::loadFont(const std::string &text_name, const int size) {
+TTF_Font* SDLRenderer::loadFont(const std::string &text_name, const int size) {
     auto it = fonts.find(text_name);
     
     if(it == fonts.end()) {
@@ -142,7 +142,7 @@ TTF_Font* Renderer::loadFont(const std::string &text_name, const int size) {
 }
 
 
-void Renderer::renderFrame() {
+void SDLRenderer::renderFrame() {
     renderAndClearImgQueue();
     
     renderAndClearUIQueue();
@@ -172,7 +172,7 @@ void Renderer::renderFrame() {
 }
 
 
-void Renderer::renderText(TTF_Font *font, const TextDrawRequest request) {
+void SDLRenderer::renderText(TTF_Font *font, const TextDrawRequest request) {
     
     SDL_Surface* textSurface = TTF_RenderText_Solid(font, request.text.c_str(), {(uint8_t)request.r, (uint8_t)request.g, (uint8_t)request.b, (uint8_t)request.a});
     
@@ -201,7 +201,7 @@ void Renderer::renderText(TTF_Font *font, const TextDrawRequest request) {
 }
 
 
-void Renderer::renderAndClearUIQueue() {
+void SDLRenderer::renderAndClearUIQueue() {
     std::stable_sort(ui_requests.begin(), ui_requests.end(), UIDrawRequest::compare);
 
     for (auto& request : ui_requests)
@@ -231,7 +231,7 @@ void Renderer::renderAndClearUIQueue() {
 }
 
 
-void Renderer::renderAndClearImgQueue()
+void SDLRenderer::renderAndClearImgQueue()
 {
     std::stable_sort(img_requests.begin(), img_requests.end(), ImageDrawRequest::compare);
     SDL_RenderSetScale(renderer, zoom_factor, zoom_factor);
@@ -286,37 +286,37 @@ void Renderer::renderAndClearImgQueue()
     img_requests.clear();
 }
 
-void Renderer::DrawUI(std::string img_name, float x, float y) {
+void SDLRenderer::DrawUI(std::string img_name, float x, float y) {
     ui_requests.push_back({img_name, (int)x, (int)y, 255, 255, 255, 255, 0});
 }
 
-void Renderer::DrawUIEx(std::string img_name, float x, float y, float r, float g, float b, float a, float sorting_order) {
+void SDLRenderer::DrawUIEx(std::string img_name, float x, float y, float r, float g, float b, float a, float sorting_order) {
     ui_requests.push_back({img_name, (int)x, (int)y, (int)r, (int)g, (int)b, (int)a, (int)sorting_order});
 }
 
-void Renderer::DrawImg(std::string img_name, float x, float y) {
+void SDLRenderer::DrawImg(std::string img_name, float x, float y) {
     ImageDrawRequest request = {img_name, x, y, 0, 1, 1, 0.5f, 0.5f, 255, 255, 255, 255, 0};
 
     img_requests.push_back(request);
 }
 
-void Renderer::DrawImgEx(std::string img_name, float x, float y, float rotation_degrees, float scale_x, float scale_y, float pivot_x, float pivot_y, float r, float g, float b, float a, float sorting_order) {
+void SDLRenderer::DrawImgEx(std::string img_name, float x, float y, float rotation_degrees, float scale_x, float scale_y, float pivot_x, float pivot_y, float r, float g, float b, float a, float sorting_order) {
     img_requests.push_back({img_name, x, y, (int)rotation_degrees, scale_x, scale_y, pivot_x, pivot_y, (int)r, (int)g, (int)b, (int)a, (int)sorting_order});
 }
 
 
-void Renderer::DrawPixel(float x, float y, float r, float g, float b, float a) {
+void SDLRenderer::DrawPixel(float x, float y, float r, float g, float b, float a) {
     pixel_requests.push_back({(int)x, (int)y, (int)r, (int)g, (int)b, (int)a});
 }
 
 
-void Renderer::setCameraPosition(float x, float y) {
+void SDLRenderer::setCameraPosition(float x, float y) {
 //    camera_pos.x = x;
 //    camera_pos.y = y;
     camera_pos = glm::vec2(x,y);
 }
 
-void Renderer::SDL_Delay() {
+void SDLRenderer::SDL_Delay() {
 
     Uint32 current_frame_end_timestamp = SDL_GetTicks();  // Record end time of the frame
     Uint32 current_frame_duration_milliseconds = current_frame_end_timestamp - current_frame_start_timestamp;

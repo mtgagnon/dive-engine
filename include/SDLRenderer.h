@@ -1,12 +1,12 @@
 //
-//  Renderer.h
+//  SDLRenderer.h
 //  dive_engine
 //
 //  Created by Mathurin Gagnon on 2/7/24.
 //
 
-#ifndef RENDERER_H
-#define RENDERER_H
+#ifndef SDLRENDERER_H
+#define SDLRENDERER_H
 
 #include <stdio.h>
 #include <string>
@@ -76,7 +76,7 @@ struct PixelDrawRequest {
     int a;
 };
 
-class Renderer {
+class SDLRenderer {
 public:
     static void initialize(const std::string &game_title);
     
@@ -152,4 +152,4 @@ private:
 };
 
 
-#endif /* RENDERER_H */
+#endif /* SDLRENDERER_H */
