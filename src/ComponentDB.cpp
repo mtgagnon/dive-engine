@@ -105,7 +105,6 @@ void ComponentDB::initComponentDB() {
                 .addFunction("GetControllerButtonUp", Input::GetControllerButtonUp)
                 .addFunction("GetControllerAxis", Input::GetControllerAxis)
             .endNamespace();
-        
 
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Audio")
@@ -118,7 +117,6 @@ void ComponentDB::initComponentDB() {
             .beginNamespace("Text")
                 .addFunction("Draw", SDLRenderer::DrawText)
             .endNamespace();
-        
         
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Image")

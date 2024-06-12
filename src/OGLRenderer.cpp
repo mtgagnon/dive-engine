@@ -156,7 +156,7 @@ void OGLRenderer::drawTriangle() {
          0.25f, -0.1f
     };
     
-    GLuint VAO;
+    uint VAO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     
