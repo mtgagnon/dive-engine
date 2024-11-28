@@ -1,0 +1,1 @@
+/usr/bin/clang -O3 -DNDEBUG CMakeFiles/playmus.dir/playmus.c.o -o playmus  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-release/external/SDL2_mixer:/home/mgagnon/dive-engine/builds/build-release/external/SDL2 libSDL2_mixer-2.0.so.0.600.3 ../SDL2/libSDL2main.a ../SDL2/libSDL2-2.0.so.0.2800.5

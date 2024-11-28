@@ -1,0 +1,41 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/dive_engine.dir/src/Actor.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/Actor.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/AudioManager.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/AudioManager.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/CollisionManager.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/CollisionManager.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/ComponentDB.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/ComponentDB.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/Engine.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/Engine.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/EngineUtils.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/EngineUtils.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/EventBus.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/EventBus.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/Input.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/Input.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/OGLRenderer.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/OGLRenderer.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/Raycast.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/Raycast.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/Rigidbody.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/Rigidbody.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/SDLRenderer.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/SDLRenderer.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/SceneDB.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/SceneDB.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/SpacialMap.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/SpacialMap.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/TemplateData.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/TemplateData.cpp.o.d"
+  "CMakeFiles/dive_engine.dir/src/main.cpp.o"
+  "CMakeFiles/dive_engine.dir/src/main.cpp.o.d"
+  "dive_engine"
+  "dive_engine.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/dive_engine.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

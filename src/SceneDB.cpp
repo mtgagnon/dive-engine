@@ -16,7 +16,7 @@
 #include "SceneDB.h"
 #include "EngineUtils.h"
 
-using glm::ivec2, glm::vec2, std::__fs::filesystem::exists, std::cout, std::sort, std::vector;
+using glm::ivec2, glm::vec2, std::filesystem::exists, std::cout, std::sort, std::vector;
 
 void SceneDB::loadNewScene(const std::string& sceneName) {
     Engine::newScene = true;

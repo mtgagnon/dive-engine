@@ -1,0 +1,1 @@
+/usr/bin/clang -fPIC -O3 -DNDEBUG -shared -Wl,-soname,libSDL2_ttf-2.0.so.0 -o libSDL2_ttf-2.0.so.0.2000.2 CMakeFiles/SDL2_ttf.dir/SDL_ttf.c.o  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-release/external/SDL2 ../SDL2/libSDL2-2.0.so.0.2800.5 /usr/lib/x86_64-linux-gnu/libfreetype.so

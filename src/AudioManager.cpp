@@ -42,7 +42,7 @@ Mix_Chunk* AudioManager::loadSound(const std::string& soundName) {
     std::string oggPath = "resources/audio/" + soundName + ".ogg";
 
     // Check which file exists and load it
-    std::string path = std::__fs::filesystem::exists(wavPath) ? wavPath : (std::__fs::filesystem::exists(oggPath) ? oggPath : "");
+    std::string path = std::filesystem::exists(wavPath) ? wavPath : (std::filesystem::exists(oggPath) ? oggPath : "");
     if (!path.empty()) {
         Mix_Chunk* chunk = Mix_LoadWAV(path.c_str());
         if (chunk) {

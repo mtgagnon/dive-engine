@@ -21,7 +21,7 @@ class AudioHelper {
                 return Mix_LoadWAV(file);
             else
             {
-                if (std::__fs::filesystem::exists(file))
+                if (std::filesystem::exists(file))
                     return &autograder_dummy_sound;
                 else
                     return nullptr;

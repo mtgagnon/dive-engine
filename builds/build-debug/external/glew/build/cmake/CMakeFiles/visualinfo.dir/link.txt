@@ -1,0 +1,1 @@
+/usr/bin/clang -O2 -g -DNDEBUG -rdynamic CMakeFiles/visualinfo.dir/__/__/src/visualinfo.c.o -o ../../../../bin/visualinfo  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-debug/lib: ../../../../lib/libGLEW.so.2.1.0 -lSM -lICE -lX11 -lXext -lGL -lGLU

@@ -20,13 +20,13 @@
 #include "EventBus.h"
 #include "SDLRenderer.h"
 
-using std::cout, std::cin, std::string, std::endl, glm::vec2, std::__fs::filesystem::exists;
+using std::cout, std::cin, std::string, std::endl, glm::vec2, std::filesystem::exists;
 
 /// Constructor!
 Engine::Engine() {    
     // check for files
     if(!exists("resources")) {
-        string wd = std::__fs::filesystem::current_path();
+        string wd = std::filesystem::current_path();
         cout << "error: " << wd << "/resources/ missing";
         exit(0);
         

@@ -1,0 +1,1 @@
+/usr/bin/clang -O3 -DNDEBUG -rdynamic CMakeFiles/glewinfo.dir/__/__/src/glewinfo.c.o -o ../../../../bin/glewinfo  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-release/lib: ../../../../lib/libGLEW.so.2.1.0 -lSM -lICE -lX11 -lXext -lGL -lGLU

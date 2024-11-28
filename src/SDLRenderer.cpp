@@ -18,7 +18,7 @@
 #include "SDL_image.h"
 #include "glm/glm.hpp"
 
-using std::__fs::filesystem::exists, std::string, std::cout;
+using std::filesystem::exists, std::string, std::cout;
 
 void SDLRenderer::initialize(const std::string &game_title) {
     

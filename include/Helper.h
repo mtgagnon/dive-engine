@@ -111,9 +111,9 @@ public:
             if (!initialized)
             {
                 /* Check for existence of frames folder and establish it if necessary. */
-                if (!std::__fs::filesystem::exists(frame_directory_relative_path))
+                if (!std::filesystem::exists(frame_directory_relative_path))
                 {
-                    std::__fs::filesystem::create_directory(frame_directory_relative_path);
+                    std::filesystem::create_directory(frame_directory_relative_path);
                 }
 
                 /* Create reusable surface. */
@@ -359,7 +359,7 @@ private:
         if (IsAutograderMode())
             _autograder_mode = true;
 
-        if (!std::__fs::filesystem::exists(USER_INPUT_FILENAME))
+        if (!std::filesystem::exists(USER_INPUT_FILENAME))
         {
             input_status = INPUT_FILE_MISSING;
             return;
