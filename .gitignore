@@ -1,5 +1,9 @@
+# don't keep build files
+build/*
 
-build
+# Allow specific files in the 'build' directory
+!build/.gitkeep
+
 **.resources
 **/resources
 **/frames
