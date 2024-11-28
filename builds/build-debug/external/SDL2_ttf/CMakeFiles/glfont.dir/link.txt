@@ -1,1 +1,0 @@
-/usr/bin/clang -O2 -g -DNDEBUG CMakeFiles/glfont.dir/glfont.c.o -o glfont  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-debug/external/SDL2_ttf:/home/mgagnon/dive-engine/builds/build-debug/external/SDL2 /usr/lib/x86_64-linux-gnu/libOpenGL.so libSDL2_ttf-2.0.so.0.2000.2 ../SDL2/libSDL2main.a ../SDL2/libSDL2-2.0.so.0.2800.5

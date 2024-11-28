@@ -1,1 +1,0 @@
-/usr/bin/clang -O2 -g -DNDEBUG CMakeFiles/showimage.dir/showimage.c.o -o showimage  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-debug/external/SDL2_image:/home/mgagnon/dive-engine/builds/build-debug/external/SDL2 libSDL2_image-2.0.so.0.600.3 ../SDL2/libSDL2main.a ../SDL2/libSDL2-2.0.so.0.2800.5

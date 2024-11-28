@@ -1,1 +1,0 @@
-/usr/bin/clang -O3 -DNDEBUG CMakeFiles/showanim.dir/showanim.c.o -o showanim  -Wl,-rpath,/home/mgagnon/dive-engine/builds/build-release/external/SDL2_image:/home/mgagnon/dive-engine/builds/build-release/external/SDL2 libSDL2_image-2.0.so.0.600.3 ../SDL2/libSDL2main.a ../SDL2/libSDL2-2.0.so.0.2800.5
