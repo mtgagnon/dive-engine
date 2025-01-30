@@ -5,13 +5,42 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "node",
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
             "request": "launch",
-            "name": "Launch Program",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${file}"
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+
+
+        {
+            "name": "(lldb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "args": [],
+            "environment": [{ "name": "config", "value": "Debug" }],
+            "cwd": "${workspaceFolder}",
+            "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/lldb",
+            "stopAtEntry": true
         }
     ]
 }
