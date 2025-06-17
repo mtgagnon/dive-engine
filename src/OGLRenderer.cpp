@@ -12,8 +12,37 @@
 #include "glm/gtc/type_ptr.hpp"
 
 #include <filesystem>
+#include <sstream>
+#include <fstream>
+#include <iostream>
 
-using std::filesystem::exists, std::cout, std::endl;
+using std::filesystem::exists, std::cout, std::endl, std::string;
+
+ShaderProgramSource OGLRenderer::parseShader(const std::string &filepath) {
+
+    enum class ShaderType{
+        NONE = -1, VERTEX = 0, FRAGMENT = 1
+    };
+
+    std::ifstream stream(filepath);
+    string line;
+    std::stringstream ss[2];
+    ShaderType type = ShaderType::NONE;
+
+    while(getline(stream, line)) {
+        if(line.find("#shader") != std::string::npos) {
+            if(line.find("vertex") != std::string::npos) {
+                type = ShaderType::VERTEX;
+            } else if (line.find("fragment") != std::string::npos) {
+                type = ShaderType::FRAGMENT;
+            }
+        } else {
+            ss[(int)type] << line << '\n';
+        }
+    }
+
+    return {ss[0].str(), ss[1].str()};
+}
 
 // Vertex and Fragment Shaders
 const char* vertexShaderSource = R"glsl(
@@ -133,9 +162,6 @@ static uint CompileShader(uint type, const std::string &source) {
 
         cout << "Failed to compile " << ((type == GL_VERTEX_SHADER) ? "vertex" : "fragment") << " shader!\n";
         cout << message << endl;
-
-        glDeleteShader(id);
-        return 0;
     }
 
     return id;
@@ -158,7 +184,7 @@ static uint CreateShader(const std::string &vertexShader, const std::string &fra
     return program;
 }
 
-void OGLRenderer::drawTriangle() {
+void OGLRenderer::drawCube(float rotate_speed) {
     //INITIALIZE WINDOW
     if(SDL_Init(SDL_INIT_VIDEO)) {
         std::cout << "SDL could not initialize! SDL_ERROR: " << SDL_GetError() << std::endl;
@@ -169,7 +195,7 @@ void OGLRenderer::drawTriangle() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
-    SDL_Window* cur_window = SDL_CreateWindow("Triangle", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_resolution, y_resolution, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+    SDL_Window* cur_window = SDL_CreateWindow("Cube", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_resolution, y_resolution, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 
     if(!cur_window) {
         std::cerr << "Window could not be created! SDL Error: " << SDL_GetError() << std::endl;
@@ -204,14 +230,14 @@ void OGLRenderer::drawTriangle() {
 
     float vertices[] = {
         // Positions
-        -0.5f, -0.5f, -0.5f, // Bottom-left-back
-        0.5f, -0.5f, -0.5f, // Bottom-right-back
-        0.5f,  0.5f, -0.5f, // Top-right-back
-        -0.5f,  0.5f, -0.5f, // Top-left-back
-        -0.5f, -0.5f,  0.5f, // Bottom-left-front
-        0.5f, -0.5f,  0.5f, // Bottom-right-front
-        0.5f,  0.5f,  0.5f, // Top-right-front
-        -0.5f,  0.5f,  0.5f  // Top-left-front
+        -0.5f, -0.5f, -0.5f, // Bottom-left-back 0
+        0.5f, -0.5f, -0.5f, // Bottom-right-back 1
+        0.5f,  0.5f, -0.5f, // Top-right-back 2
+        -0.5f,  0.5f, -0.5f, // Top-left-back 3
+        -0.5f, -0.5f,  0.5f, // Bottom-left-front 4
+        0.5f, -0.5f,  0.5f, // Bottom-right-front 5
+        0.5f,  0.5f,  0.5f, // Top-right-front 6
+        -0.5f,  0.5f,  0.5f  // Top-left-front 7
     };
 
 
@@ -233,10 +259,9 @@ void OGLRenderer::drawTriangle() {
 
     glEnable(GL_DEPTH_TEST);
 
-    uint VAO, VBO, EBO;
+    uint VAO, VBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
 
     glBindVertexArray(VAO);
 
@@ -244,46 +269,27 @@ void OGLRenderer::drawTriangle() {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Element Buffer Object
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    // index buffer
+    unsigned int IBO;
+    glGenBuffers(1, &IBO);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6*6*sizeof(unsigned int), indices, GL_STATIC_DRAW);
 
     // Vertex Attribute Pointer
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    const std::string vertexShader = R"glsl(
-        #version 330 core
 
-        layout(location = 0) in vec3 position;
 
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-
-        void main() {
-            gl_Position = projection * view * model * vec4(position, 1.0);
-        }
-        )glsl";
-
-    std::string fragmentShader = R"glsl(
-        #version 330 core
-
-        out vec4 FragColor;
-
-        void main() {
-            FragColor = vec4(1.0, 0.5, 0.2, 1.0); // Orange color
-        }
-        )glsl";
-
-    uint shader = CreateShader(vertexShader, fragmentShader);
+    // uint shader = CreateShader(vertexShader, fragmentShader);
+    uint shader = 0;
     glUseProgram(shader);
 
     // Set transformation matrices
-    glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians((float)SDL_GetTicks() / 50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+    glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians((float)SDL_GetTicks() * rotate_speed), glm::vec3(0.5f, 1.0f, 0.0f));
     glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
-
 
     GLuint modelLoc = glGetUniformLocation(shader, "model");
     GLuint viewLoc = glGetUniformLocation(shader, "view");
@@ -305,7 +311,7 @@ void OGLRenderer::drawTriangle() {
             }
         }
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         model = glm::rotate(glm::mat4(1.0f), glm::radians((float)SDL_GetTicks() / 50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -318,10 +324,9 @@ void OGLRenderer::drawTriangle() {
 
     // Cleanup
     glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    glDeleteBuffers(1, &IBO);
     glDeleteVertexArrays(1, &VAO);
     SDL_GL_DeleteContext(cur_context);
     SDL_DestroyWindow(cur_window);
     SDL_Quit();
 }
-

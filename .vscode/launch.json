@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(lldb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
+        {
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
@@ -27,20 +39,6 @@
                     "ignoreFailures": true
                 }
             ]
-        },
-
-
-        {
-            "name": "(lldb) Launch",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
-            "args": [],
-            "environment": [{ "name": "config", "value": "Debug" }],
-            "cwd": "${workspaceFolder}",
-            "MIMode": "lldb",
-            "miDebuggerPath": "/usr/bin/lldb",
-            "stopAtEntry": true
         }
     ]
 }

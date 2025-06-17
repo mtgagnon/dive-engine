@@ -11,21 +11,26 @@
 #include <iostream>
 
 #include "Engine.h"
-#include "OGLRenderer.h"
+// #include "OGLRenderer.h"
+#include <filesystem>
 
 using std::cout, std::cin, std::string;
 
-inline static SDL_Renderer* renderer = nullptr;
+// inline static SDL_Renderer* renderer = nullptr;
 
 
 int main(int argc, char* argv[]){
 
-//    Engine engine;
-//    engine.game_loop();
-//
-//    OGLRenderer::initialize("OGL Test");
-//    OGLRenderer::destroyRenderer();
+    Engine engine;
+    engine.game_loop();
 
-    OGLRenderer::drawTriangle();
-    return 0;
+    // OGLRenderer::initialize("OGL Test");
+    // OGLRenderer::destroyRenderer();
+
+    // cout << "CURRENT WORKING DIRECTORY\n";
+    // cout << std::filesystem::current_path() << '\n';
+
+    // float rotate_speed = 0.01f;
+    // OGLRenderer::drawCube(rotate_speed);
+    // return 0;
 }

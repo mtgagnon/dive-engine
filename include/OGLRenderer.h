@@ -16,6 +16,12 @@
 #include "SDL2/SDL.h"
 #include "Actor.h"
 
+struct ShaderProgramSource {
+    std::string FragmentSource;
+    std::string VertexSource;
+};
+
+
 class OGLRenderer {
 public:
 
@@ -35,7 +41,9 @@ public:
 
     static int GetFrameNumber() {return frame_number;};
 
-    static void drawTriangle();
+    static void drawCube(float rotate_speed);
+
+    static ShaderProgramSource parseShader(const std::string &filepath);
 
     // camera functions
 //    static void setCameraPosition(float x, float y, float z = 0);

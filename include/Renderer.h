@@ -5,9 +5,9 @@
 //  Created by Mathurin Gagnon on 5/26/24.
 //
 
-#ifndef Renderer_hpp
-#define Renderer_hpp
+#ifndef RENDERER_H
+#define RENDERER_H
 
 #include <stdio.h>
 
-#endif /* Renderer_hpp */
+#endif /* RENDERER_H */
