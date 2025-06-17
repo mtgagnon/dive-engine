@@ -1,0 +1,15 @@
+{
+	"name": "Dirt_Tile",
+	"components": {
+		"1": {
+			"type": "SpriteRenderer",
+			"sprite": "dirt",
+			"sorting_order": -999
+		},
+		"2": {
+			"type": "Rigidbody",
+			"body_type": "kinematic",
+			"has_trigger": false
+		}
+	}
+}

@@ -1,0 +1,26 @@
+{
+	"name": "player",
+	"components": {
+		"1": {			
+			"type": "Rigidbody",
+			"body_type": "static",
+			"trigger_type": "circle",
+			"trigger_radius": 0.55,
+			"width": 1,
+			"height": 0.3
+		},
+		"3": {
+			"type": "SpriteRenderer",
+			"sprite": "ant_hill"
+		},
+		"4": {
+			"type": "CollectObject"
+		},
+		"DrawScore": {
+			"type": "DrawScore"
+		},
+		"DrawUI":{
+			"type": "DrawUI"
+		}
+	}
+}

@@ -1,0 +1,59 @@
+{
+	"actors": [
+		{
+			"name": "background",
+			"components": {
+				"1": {
+					"type": "SpriteRenderer",
+					"sprite": "title"
+				}
+			}
+		},
+		{
+			"name": "text",
+			"components": {
+				"1": {
+					"type": "DrawText",
+					"x": 200,
+					"y": 300,
+					"r": 0, 
+					"g": 0,
+					"b":0,
+					"font_name": "ToThePoint",
+					"font_size": 200,
+					"str_content": "Colony Carry"
+				}
+			}
+		},
+		{
+			"name": "fading_text",
+			"components": {
+				"1": {
+					"type": "DrawFadingText",
+					"x": 100,
+					"y": 600,
+					"r": 0, 
+					"g": 0,
+					"b":0,
+					"font_name": "PlainJane",
+					"font_size": 60,
+					"str_content": "Press Space to Begin",
+					"fade": true
+				},
+				"2": {
+					"type": "SceneChangeOnSpace"
+				}
+			}
+		},
+			{
+			"name": "audio",
+			"components": {
+				"1": {
+					"type": "PlayAudio",
+					"clip_name": "title_music",
+					"does_loop": 1
+				}
+			}
+		}
+	]
+}
