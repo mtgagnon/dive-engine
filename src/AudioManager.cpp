@@ -17,7 +17,7 @@ void AudioManager::initialize() {
         std::cerr << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError();
         exit(0);
     }
-    
+
     Mix_AllocateChannels(50);
 }
 
@@ -26,7 +26,7 @@ void AudioManager::play(int channel, const std::string& sound_name, bool loop) {
     if (sound) {
         Mix_PlayChannel(channel, sound, (loop) ? -1 : 0);
     } else {
-        std::cout << "error: failed to play audio clip " << sound_name;
+        std::cout << "error: failed to play audio clip " << sound_name << '\n';
         exit(0);
     }
 }
@@ -54,12 +54,12 @@ Mix_Chunk* AudioManager::loadSound(const std::string& soundName) {
     return nullptr; // Sound could not be loaded
 }
 
-void AudioManager::halt(int channel) { 
+void AudioManager::halt(int channel) {
     Mix_HaltChannel(channel); // Halt all channels
 }
 
-void AudioManager::setVolume(int channel, float volume) { 
-    
+void AudioManager::setVolume(int channel, float volume) {
+
     Mix_Volume(channel, volume);
 }
 
