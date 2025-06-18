@@ -5,6 +5,7 @@ builds/*
 !builds/.gitkeep
 
 .vscode/*
+!.vscode/launch.json
 
 **.resources
 **/frames
@@ -21,24 +22,7 @@ game_engine_osx
 osx_build_derived_data
 **.DS_Store
 **.dSYM
-# **.png
-# **.PNG
-# **.jpeg
-# **.JPEG
-# **.jpg
-# **.JPG
-# **.bmp
-# **.BMP
-# **.gif
-# **.GIF
 **.entitlements
-
-# **.wav
-# **.mp3
-# **.ogg
-# **.raw
-# **.mp4
-# **.mov
 
 # Visual Studio / MSBuild build artifacts
 # User-specific files
