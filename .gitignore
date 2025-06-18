@@ -4,9 +4,6 @@ builds/*
 # Allow specific files in the 'build' directory
 !builds/.gitkeep
 
-.vscode/*
-!.vscode/launch.json
-
 **.resources
 **/frames
 user_input.txt
@@ -406,11 +403,7 @@ FodyWeavers.xsd
 
 # VS Code files for those working on multiple tools
 .vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
 !.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
 
 # Local History for Visual Studio Code
 .history/
@@ -467,6 +460,3 @@ xcuserdata/
 *.out
 *.app
 sdl_user_input.txt
-.vscode/settings.json
-.vscode/tasks.json
-.vscode/launch.json
