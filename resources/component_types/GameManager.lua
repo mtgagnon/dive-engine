@@ -13,7 +13,7 @@ GameManager = {
 	-- 8 : left leaf
 	-- 9 : right leaf
 
-	
+
 	stage1 = {
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, --21x37
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -42,19 +42,19 @@ GameManager = {
 		local controller = 0
 		local center_pos
 		-- Spawn stage
-		for y=1,21 do 
+		for y=1,21 do
 			for x = 1,37 do
 				local tile_code = self.stage1[y][x]
 				local tile_pos = Vector2(x, y)
 
 
-				if tile_code == -1 then 
+				if tile_code == -1 then
 					local new_tile = Actor.Instantiate("Dirt_Tile")
 					local new_tile_rb = new_tile:GetComponent("Rigidbody")
 
 					new_tile_rb.x = tile_pos.x
 					new_tile_rb.y = tile_pos.y
-				elseif tile_code == 1 then 
+				elseif tile_code == 1 then
 					local new_tile = Actor.Instantiate("Ground_Tile")
 					local new_tile_rb = new_tile:GetComponent("Rigidbody")
 					if y == 20 and x ~= 19 then
@@ -64,14 +64,16 @@ GameManager = {
 						local tile_pos = new_tile_rb:GetPosition()
 						Camera.SetPosition(tile_pos.x, tile_pos.y)
 					end
-		
+
 
 					new_tile_rb.x = tile_pos.x
 					new_tile_rb.y = tile_pos.y
 				elseif tile_code == 2 then
 					Debug.Log("instantiating player")
 
-					local new_player = Actor.Instantiate("player")
+					local new_player = Actor.Instantiate("Player")
+					Debug.Log("instantiating player2")
+
 					local new_player_rb = new_player:GetComponent("Rigidbody")
 					-- CONTROLLER API
 					-- local new_player_controls = new_player:GetComponent("ControllerControls")
@@ -87,7 +89,7 @@ GameManager = {
 					new_strawberry_rb.y = tile_pos.y
 				elseif tile_code == 4 then
 					Debug.Log("instantiating player 2")
-					local new_player2 = Actor.Instantiate("player2")
+					local new_player2 = Actor.Instantiate("Player2")
 					local new_player2_rb = new_player2:GetComponent("Rigidbody")
 					new_player2_rb.x = tile_pos.x
 					new_player2_rb.y = tile_pos.y
@@ -97,7 +99,7 @@ GameManager = {
 					local new_tile = new_tile:GetComponent("Rigidbody")
 					new_tile.x = tile_pos.x
 					new_tile.y = tile_pos.y
-				elseif tile_code == 6 then 
+				elseif tile_code == 6 then
 					center_pos = tile_pos
 				elseif tile_code == 7 then
 					Debug.Log("ant_hill 2")
@@ -109,7 +111,7 @@ GameManager = {
 						new_player2_text.x = 1200
 						new_player2_sprite.sprite = "ant2"
 						new_player2_sprite.x = 1200
-					else 
+					else
 						new_player2_text.x = 100
 						new_player2_sprite.sprite = "ant"
 						new_player2_sprite.x = 100
@@ -127,7 +129,7 @@ GameManager = {
 					new_tile.x = tile_pos.x
 					new_tile.y = tile_pos.y
 				end
-		
+
 			end
 		end
 
@@ -137,7 +139,7 @@ GameManager = {
 	end,
 
 	OnUpdate = function(self)
-		
+
 	end
 }
 
