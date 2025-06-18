@@ -1,6 +1,6 @@
 # <#Dive Engine CMAKE#>
 
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.28)
 
 project(dive_engine)
 
@@ -37,7 +37,7 @@ target_include_directories("${PROJECT_NAME}" PRIVATE
 
 # Need to set the directory where the executable is put and the engine is run out of (directory where we search for our resources folder from)
 # Currently setting it to the root project directory and not the build directory since we clear xcode builds occasionally and not the root folder
-# May change this but for now this is good. 
+# May change this but for now this is good.
 # set_target_properties("${PROJECT_NAME}" PROPERTIES
 # )
 

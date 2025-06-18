@@ -1,0 +1,21 @@
+{
+	"name": "Strawberry",
+	"components": {
+		"1": {
+			"type": "Rigidbody",
+			"has_collider": true,
+			"collider_type": "circle",
+			"has_trigger": true,
+			"radius": 0.4,
+			"trigger_radius": 0.025
+		},
+		"2": {
+			"type": "SpriteRenderer",
+			"sprite": "strawberry",
+			"sorting_order": 0
+		},
+		"3": {
+			"type": "CanBeGrabbed"
+		}
+	}
+}

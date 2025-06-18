@@ -76,7 +76,7 @@ cmake_dependent_option(SDL2MIXER_FLAC_LIBFLAC_SHARED "Dynamically load LIBFLAC" 
 
 cmake_dependent_option(SDL2MIXER_FLAC_DRFLAC "Enable FLAC music using drflac" ON SDL2MIXER_FLAC OFF)
 
-# MTGAGNON CUSTOM CHANGE TURNED OFF MOD MUSIC SUPPORT
+#  CUSTOM CHANGE TURNED OFF MOD MUSIC SUPPORT
 option(SDL2MIXER_MOD "Support loading MOD music" OFF)
 
 cmake_dependent_option(SDL2MIXER_MOD_MODPLUG "Support loading MOD music via modplug" ON SDL2MIXER_MOD OFF)

@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Linux Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "launchCompleteCommand": "exec-run",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "macOS Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "launchCompleteCommand": "exec-run",
+            "MIMode": "lldb"
+        },
+        {
+            "name": "Windows Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builds/build-debug/dive_engine",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "launchCompleteCommand": "exec-run",
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:\\MinGw\\bin\\gdb.exe"
+        }
+    ]
+}

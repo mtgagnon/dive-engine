@@ -1,0 +1,37 @@
+{
+	"actors": [
+		{
+			"name": "GameManager",
+			"components": {
+				"1": {
+					"type": "GameManager"
+				},
+				"2": {
+					"type": "Generator"
+				}
+			}
+		},
+		{
+			"name": "debug_actor",
+			"components": {
+				"A": {
+					"type": "ComponentA"
+				},
+				"B": {
+					"type": "ComponentB"
+				}
+			}
+		},
+		{
+			"name": "audio",
+			"components": {
+				"1": {
+					"type": "PlayAudio",
+					"clip_name": "gameplay_music",
+					"does_loop": 1
+				}
+			}
+		}
+
+	]
+}

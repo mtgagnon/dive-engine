@@ -1,0 +1,16 @@
+{
+	"name": "Tile",
+	"components": {
+		"1" : {
+			"type": "Rigidbody",
+			"has_collider": false,
+			"has_trigger": false,
+			"gravity_scale": 0
+		},
+		"2": {
+			"type": "SpriteRenderer",
+			"sprite": "tile",
+			"sorting_order": -99999
+		}
+	}
+}

@@ -12,7 +12,7 @@
 #include "SceneDB.h"
 #include "Helper.h"
 #include "Input.h"
-#include "Renderer.h"
+#include "SDLRenderer.h"
 #include "AudioManager.h"
 #include "SceneDB.h"
 #include "box2d/box2d.h"
@@ -21,29 +21,28 @@
 #include "CollisionManager.h"
 #include "Raycast.h"
 #include "EventBus.h"
-#include "Renderer.h"
 
 #include <thread>
 #include <iostream>
 #include <filesystem>
 
-using std::__fs::filesystem::exists;
+using std::filesystem::exists;
 
 void ComponentDB::initComponentDB() {
-    
+
     b2Vec2 vec = b2Vec2(0,0);
     vec.Normalize();
-    
+
     if(!lua_state) {
         lua_state = luaL_newstate();
         luaL_openlibs(lua_state);
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Debug")
                 .addFunction("Log", ComponentDB::CppLog)
                 .addFunction("LogError", ComponentDB::CppLogError)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<b2Vec2>("Vector2")
                 .addConstructor<void(*) (float, float)>()
@@ -57,7 +56,7 @@ void ComponentDB::initComponentDB() {
                 .addStaticFunction("Distance", b2Distance)
                 .addStaticFunction("Dot", static_cast<float (*)(const b2Vec2&, const b2Vec2&)>(&b2Dot))
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<Actor>("actor")
                 .addFunction("GetName", &Actor::GetName)
@@ -68,7 +67,7 @@ void ComponentDB::initComponentDB() {
                 .addFunction("AddComponent", &Actor::addComponent)
                 .addFunction("RemoveComponent", &Actor::removeComponent)
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Actor")
                 .addFunction("Find", SceneDB::find)
@@ -76,7 +75,7 @@ void ComponentDB::initComponentDB() {
                 .addFunction("Instantiate", SceneDB::instantiate)
                 .addFunction("Destroy", SceneDB::destroy)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Application")
                 .addFunction("Quit", ComponentDB::quit)
@@ -84,13 +83,13 @@ void ComponentDB::initComponentDB() {
                 .addFunction("GetFrame", ComponentDB::getFrame)
                 .addFunction("OpenURL", ComponentDB::openURL)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<glm::vec2>("vec2")
                 .addProperty("x", &glm::vec2::x)
                 .addProperty("y", &glm::vec2::y)
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Input")
                 .addFunction("GetKey", Input::GetKey)
@@ -106,7 +105,6 @@ void ComponentDB::initComponentDB() {
                 .addFunction("GetControllerButtonUp", Input::GetControllerButtonUp)
                 .addFunction("GetControllerAxis", Input::GetControllerAxis)
             .endNamespace();
-        
 
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Audio")
@@ -114,38 +112,37 @@ void ComponentDB::initComponentDB() {
             .addFunction("Halt", AudioManager::halt)
             .addFunction("SetVolume", AudioManager::setVolume)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Text")
-                .addFunction("Draw", Renderer::DrawText)
+                .addFunction("Draw", SDLRenderer::DrawText)
             .endNamespace();
-        
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Image")
-                .addFunction("DrawUI", Renderer::DrawUI)
-                .addFunction("DrawUIEx", Renderer::DrawUIEx)
-                .addFunction("Draw", Renderer::DrawImg)
-                .addFunction("DrawEx", Renderer::DrawImgEx)
-                .addFunction("DrawPixel", Renderer::DrawPixel)
+                .addFunction("DrawUI", SDLRenderer::DrawUI)
+                .addFunction("DrawUIEx", SDLRenderer::DrawUIEx)
+                .addFunction("Draw", SDLRenderer::DrawImg)
+                .addFunction("DrawEx", SDLRenderer::DrawImgEx)
+                .addFunction("DrawPixel", SDLRenderer::DrawPixel)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Camera")
-                .addFunction("SetPosition", Renderer::setCameraPosition)
-                .addFunction("GetPositionX", Renderer::getCameraPositionX)
-                .addFunction("GetPositionY", Renderer::getCameraPositionY)
-                .addFunction("SetZoom", Renderer::setZoom)
-                .addFunction("GetZoom", Renderer::getZoom)
+                .addFunction("SetPosition", SDLRenderer::setCameraPosition)
+                .addFunction("GetPositionX", SDLRenderer::getCameraPositionX)
+                .addFunction("GetPositionY", SDLRenderer::getCameraPositionY)
+                .addFunction("SetZoom", SDLRenderer::setZoom)
+                .addFunction("GetZoom", SDLRenderer::getZoom)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Scene")
                 .addFunction("Load", SceneDB::loadNewScene)
                 .addFunction("GetCurrent", SceneDB::getSceneName)
                 .addFunction("DontDestroy", SceneDB::dontDestroy)
             .endNamespace();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<RigidBody>("Rigidbody")
                 .addData("key", &RigidBody::key)
@@ -181,7 +178,7 @@ void ComponentDB::initComponentDB() {
                 .addFunction("GetUpDirection", &RigidBody::GetUpDirection)
                 .addFunction("GetRightDirection", &RigidBody::GetRightDirection)
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<Collision>("collison")
                 .addData("other", &Collision::other)
@@ -189,7 +186,7 @@ void ComponentDB::initComponentDB() {
                 .addData("relative_velocity", &Collision::relative_velocity)
                 .addData("normal", &Collision::normal)
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginClass<HitResult>("HitResult")
                 .addConstructor<void(*)(Actor*, const b2Vec2&, const b2Vec2&, bool)>()
@@ -198,7 +195,7 @@ void ComponentDB::initComponentDB() {
                 .addProperty("normal", &HitResult::normal) // Same for b2Vec2
                 .addProperty("is_trigger", &HitResult::is_trigger)
             .endClass();
-        
+
         luabridge::getGlobalNamespace(lua_state)
             .beginNamespace("Physics")
                 .addFunction("Raycast", Raycast::PerformRaycast)
@@ -211,21 +208,21 @@ void ComponentDB::initComponentDB() {
                 .addFunction("Subscribe", EventBus::Subscribe)
                 .addFunction("Unsubscribe", EventBus::Unsubscribe)
             .endNamespace();
-        
+
     }
 }
 
 luabridge::LuaRef ComponentDB::getParentRef(std::string &type) {
     if(!exists("resources/component_types/" + type + ".lua")) {
-        std::cout << "error: failed to locate component " << type;
+        std::cout << "error: failed to locate component " << type << '\n';
         exit(0);
     } else if (components.find(type) == components.end() && luaL_dofile(lua_state, ("resources/component_types/" + type + ".lua").c_str()) != LUA_OK) {
-        std::cout << "problem with lua file " <<  type;
+        std::cout << "problem with lua file " <<  type << '\n';
         exit(0);
     } else if (components.find(type) == components.end()) {
         components.insert(type);
     }
-    
+
     return luabridge::getGlobal(lua_state, type.c_str());
 }
 
@@ -234,7 +231,7 @@ void ComponentDB::establishLuaInheritance(luabridge::LuaRef& instance_table, lua
     luabridge::LuaRef new_metatable = luabridge::newTable(lua_state);
 
     new_metatable["__index"] = parent_table;
-    
+
     // We must use the raw Lua C API (Lua stack) to perform a "setmetatable" operation.
     instance_table.push(lua_state);
     new_metatable.push(lua_state);
@@ -259,12 +256,12 @@ void ComponentDB::sleep(int milliseconds) {
     std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
-int ComponentDB::getFrame() { 
-    return Renderer::GetFrameNumber();
+int ComponentDB::getFrame() {
+    return SDLRenderer::GetFrameNumber();
 }
 
-void ComponentDB::openURL(std::string url) { 
-    
+void ComponentDB::openURL(std::string url) {
+
     std::string cmd;
 #if defined(_WIN32)
         cmd = "start " + url;
@@ -275,7 +272,7 @@ void ComponentDB::openURL(std::string url) {
 #else
 #error "Platform not supported!"
 #endif
-    
+
     std::system(cmd.c_str());
 }
 

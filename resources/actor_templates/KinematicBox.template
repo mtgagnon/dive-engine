@@ -1,0 +1,15 @@
+{
+	"name": "falling_box",
+	"components": {
+		"1": {
+			"type": "SpriteRenderer",
+			"sprite": "box2",
+			"sorting_order": -999
+		},
+		"2": {
+			"type": "Rigidbody",
+			"body_type": "kinematic",
+			"has_trigger": false
+		}
+	}
+}

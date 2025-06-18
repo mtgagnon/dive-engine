@@ -18,24 +18,24 @@
 #include "EngineUtils.h"
 #include "Rigidbody.h"
 #include "EventBus.h"
-#include "Renderer.h"
+#include "SDLRenderer.h"
 
-using std::cout, std::cin, std::string, std::endl, glm::vec2, std::__fs::filesystem::exists;
+using std::cout, std::cin, std::string, std::endl, glm::vec2, std::filesystem::exists;
 
 /// Constructor!
-Engine::Engine() {    
+Engine::Engine() {
     // check for files
     if(!exists("resources")) {
-        string wd = std::__fs::filesystem::current_path();
-        cout << "error: " << wd << "/resources/ missing";
+        string wd = std::filesystem::current_path();
+        cout << "error: " << wd << "/resources/ missing" << '\n';
         exit(0);
-        
+
     } else if(!exists("resources/game.config")) {
-        cout << "error: resources/game.config missing";
+        cout << "error: resources/game.config missing" << '\n';
         exit(0);
-        
+
     }
-    
+
     initialize();
 }
 
@@ -43,56 +43,56 @@ Engine::Engine() {
 void Engine::initialize() {
     rapidjson::Document config;
     EngineUtils::ReadJsonFile("resources/game.config", config);
-    
+
     ComponentDB::initComponentDB(); // necessary for lua
-    
+
     string game_title = "";
     if(config.HasMember("game_title")) {
         game_title = config["game_title"].GetString();
     }
-    
-    Renderer::initialize(game_title);
+
+    SDLRenderer::initialize(game_title);
     AudioManager::initialize();
     Input::initialize();
-    
+
     // INITIAL SCENE
     string initial_scene;
     if(config.HasMember("initial_scene") && config["initial_scene"].IsString()) {
         initial_scene = config["initial_scene"].GetString();
     } else {
-        cout << "error: initial_scene unspecified";
+        cout << "error: initial_scene unspecified" << '\n';
         exit(0);
     }
-    
+
     SceneDB::loadNewScene(initial_scene);
 }
 
 
 void Engine::game_loop() {
     isRunning = true;
-    
+
     while(isRunning) {
         if(newScene) {
             SceneDB::loadScene();
             SceneDB::startScene();
             newScene = false;
         }
-        
-        Renderer::clearFrame();
-        
+
+        SDLRenderer::clearFrame();
+
         input();
-        
+
         SceneDB::updateActors();
 
         EventBus::PushChangesToSubList();
 
         RigidBody::physicsStep();
-        
-        Renderer::renderFrame();
-        Renderer::showFrame();
+
+        SDLRenderer::renderFrame();
+        SDLRenderer::showFrame();
         Input::LateUpdate();
     }
-    
+
     return;
 }
 
@@ -110,6 +110,6 @@ void Engine::input() {
                 Input::ProcessEvent(event);
         }
     }
-    
+
 }
 

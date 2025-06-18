@@ -1,0 +1,24 @@
+{
+	"name": "player2",
+	"components": {
+		"1" : {
+			"type": "Rigidbody",
+			"has_trigger": true,
+			"trigger_type": "circle",
+			"trigger_radius": 0.55,
+			"width": 1,
+			"height": 0.3,
+			"gravity_scale": 2
+		},
+		"2": {
+			"type": "KeyboardControlsP2"
+		},
+		"3": {
+			"type": "SpriteRenderer",
+			"sprite": "ant2"
+		},
+		"4": {
+			"type": "Grab"
+		}
+	}
+}

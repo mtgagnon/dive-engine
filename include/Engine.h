@@ -16,7 +16,7 @@
 #include "lua.hpp"
 #include "SDL2/SDL.h"
 #include "rapidjson/document.h"
-#include "Renderer.h"
+#include "SDLRenderer.h"
 #include "Actor.h"
 #include "glm/glm.hpp"
 #include "SceneDB.h"
