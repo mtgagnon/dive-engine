@@ -99,7 +99,7 @@ void SceneDB::updateActors() {
         }
     }
 
-    // AS WE GO THROUGH THE ACTORS LIST IF THE ACTOR GETS DESTROYED ADD IT TO THE ACTORS_TO_REMOVE
+    // AS WE GO THROUGH THE ACTORS LIST IF THE ACTOR WAS/GETS DESTROYED ADD IT TO THE ACTORS_TO_REMOVE
     // late update
     for(auto actor_it = actors.begin(); actor_it != actors.end(); actor_it++) {
         auto actor = *actor_it;
@@ -116,7 +116,7 @@ void SceneDB::updateActors() {
     }
 
 
-    // add actors, if they are destroyed add to the to be removed
+    // add actors, if they have been destroyed add to the to be removed
     for(auto actor_it = actors_to_add.begin(); actor_it != actors_to_add.end(); actor_it++) {
         auto actor = *actor_it;
 
@@ -129,7 +129,7 @@ void SceneDB::updateActors() {
     }
 
     // remove actors
-    for(auto it = actors_to_remove.rbegin(); it != actors_to_remove.rend(); it++) { // need to iterate through actors_to_remove in reverse because iterators shift as you delete things before them
+     for(auto it = actors_to_remove.rbegin(); it != actors_to_remove.rend(); it++) { // need to iterate through actors_to_remove in reverse because iterators shift as you delete things before them
         (**it)->OnDestroy();
         actors.erase(*it);
     }
@@ -189,7 +189,7 @@ void SceneDB::destroy(Actor* actor) {
 
     auto actors_with_name = actors_by_name.find(actor->name); // will be completely updated with all new actors
 
-    //remove from actors_of_name and permanent actors, don't need to remove from actors_to_add, just don't add it to actors vector
+    // remove from actors_with_name and permanent actors, don't need to remove from actors_to_add, just don't add it to actors vector
     for(auto actor_it = actors_with_name->second.begin(); actor_it != actors_with_name->second.end(); actor_it++) {
 
         if((*actor_it)->actor_id == actor->actor_id) {

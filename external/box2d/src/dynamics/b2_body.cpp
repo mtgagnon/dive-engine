@@ -26,7 +26,9 @@
 #include "box2d/b2_joint.h"
 #include "box2d/b2_world.h"
 
+#include <iostream>
 #include <new>
+
 
 b2Body::b2Body(const b2BodyDef* bd, b2World* world)
 {
@@ -110,9 +112,10 @@ b2Body::~b2Body()
 
 void b2Body::SetType(b2BodyType type)
 {
-	b2Assert(m_world->IsLocked() == false);
+	// b2Assert(m_world->IsLocked() == false);
 	if (m_world->IsLocked() == true)
 	{
+		std::cout << "Warning: called SetType on a locked rigidbody (during physics calculations), aborting" << std::endl;
 		return;
 	}
 
@@ -164,9 +167,10 @@ void b2Body::SetType(b2BodyType type)
 
 b2Fixture* b2Body::CreateFixture(const b2FixtureDef* def)
 {
-	b2Assert(m_world->IsLocked() == false);
+	// b2Assert(m_world->IsLocked() == false);
 	if (m_world->IsLocked() == true)
 	{
+		std::cout << "Warning: called CreateFixture on a locked rigidbody (during physics calculations), aborting" << std::endl;
 		return nullptr;
 	}
 
@@ -217,9 +221,10 @@ void b2Body::DestroyFixture(b2Fixture* fixture)
 		return;
 	}
 
-	b2Assert(m_world->IsLocked() == false);
+	// b2Assert(m_world->IsLocked() == false);
 	if (m_world->IsLocked() == true)
 	{
+		std::cout << "Warning: called DestroyFixture on a locked rigidbody (during physics calculations), aborting" << std::endl;
 		return;
 	}
 
@@ -350,9 +355,10 @@ void b2Body::ResetMassData()
 
 void b2Body::SetMassData(const b2MassData* massData)
 {
-	b2Assert(m_world->IsLocked() == false);
+	// b2Assert(m_world->IsLocked() == false);
 	if (m_world->IsLocked() == true)
 	{
+		std::cout << "Warning: called SetMassData on a locked rigidbody (during physics calculations), aborting" << std::endl;
 		return;
 	}
 
@@ -414,9 +420,10 @@ bool b2Body::ShouldCollide(const b2Body* other) const
 
 void b2Body::SetTransform(const b2Vec2& position, float angle)
 {
-	b2Assert(m_world->IsLocked() == false);
+	// b2Assert(m_world->IsLocked() == false);
 	if (m_world->IsLocked() == true)
 	{
+		std::cout << "Warning: called SetTransform on a locked rigidbody (during physics calculations), aborting" << std::endl;
 		return;
 	}
 
@@ -442,7 +449,6 @@ void b2Body::SetTransform(const b2Vec2& position, float angle)
 void b2Body::SynchronizeFixtures()
 {
 	b2BroadPhase* broadPhase = &m_world->m_contactManager.m_broadPhase;
-
 	if (m_flags & b2Body::e_awakeFlag)
 	{
 		b2Transform xf1;
@@ -465,7 +471,11 @@ void b2Body::SynchronizeFixtures()
 
 void b2Body::SetEnabled(bool flag)
 {
-	b2Assert(m_world->IsLocked() == false);
+	if (m_world->IsLocked() == true)
+	{
+		std::cout << "Warning: called SetEnabled on a locked rigidbody (during physics calculations), aborting" << std::endl;
+		return;
+	}
 
 	if (flag == IsEnabled())
 	{
