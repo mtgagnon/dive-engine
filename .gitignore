@@ -3,6 +3,7 @@ builds/*
 
 # Allow specific files in the 'build' directory
 !builds/.gitkeep
+compile_commands.json
 
 **.resources
 **/frames
