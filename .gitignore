@@ -420,6 +420,12 @@ FodyWeavers.xsd
 *.sln.iml
 
 
+# SDL2 bundled test/demo assets
+external/SDL2/test/
+external/SDL2/Xcode-iOS/Demos/data/
+external/SDL2_image/test/
+external/SDL2_ttf/external/freetype/builds/unix/configure.raw
+
 # xcode
 ## User settings
 xcuserdata/
