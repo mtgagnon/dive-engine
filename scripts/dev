@@ -1,0 +1,33 @@
+#!/usr/bin/env zsh
+# Project dev helper
+# Usage:
+#   dev build -l    configure + compile + run (Linux debug)
+#   dev build -m    configure + compile + run (Mac/Xcode)
+#   dev run   -l    compile + run, skip configure (Linux debug)
+#   dev run   -m    compile + run, skip configure (Mac/Xcode)
+
+_build() {
+  case "$1" in
+    -l) eval "$BUILD_LINUX_D" && cmake --build $PROJECT_DIR/builds/build-debug && eval "$LINK_COMPILE_COMMANDS" && $PROJECT_DIR/builds/build-debug/dive_engine ;;
+    -m) eval "$BUILD_MAC" && cmake --build $PROJECT_DIR/builds/build-xcode && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
+    *)  echo "Usage: dev build -l | -m" ;;
+  esac
+}
+
+_run() {
+  case "$1" in
+    -l) cmake --build $PROJECT_DIR/builds/build-debug && $PROJECT_DIR/builds/build-debug/dive_engine ;;
+    -m) cmake --build $PROJECT_DIR/builds/build-xcode && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
+    *)  echo "Usage: dev run -l | -m" ;;
+  esac
+}
+
+case "$1" in
+  build) _build "$2" ;;
+  run)   _run   "$2" ;;
+  *)
+    echo "Usage: dev <command> <platform>"
+    echo "  Commands:  build | run"
+    echo "  Platforms: -l (Linux) | -m (Mac)"
+    ;;
+esac

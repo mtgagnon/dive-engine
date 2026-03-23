@@ -30,7 +30,7 @@ SDL_Window* createWindow(const std::string& game_title, int x_resolution, int y_
         SDL_WINDOWPOS_CENTERED,
         x_resolution,
         y_resolution,
-        SDL_WINDOW_SHOWN  // Change to SDL_WINDOW_VULKAN when using VKRenderer
+        SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN  // Change to SDL_WINDOW_VULKAN when using VKRenderer
     );
 
     if(!window) {
@@ -48,9 +48,30 @@ int main(int argc, char* argv[]){
 
     // testing and sandboxing with VKRenderer
 
-    SDL_Window* window = createWindow("Vulkan Test", 640, 360);
-    VKRenderer renderer;
-    renderer.initialize(window);
-    renderer.cleanup();
-    return 0;
+    SDL_Window* window = createWindow("Vulkan Test", 2*640, 2*360);
+    VKRenderer renderer(window);
+    bool running = true;
+
+    try {
+        while (running) {
+            renderer.beginFrame();
+            // calls to the renderer happen here
+            renderer.endFrame();
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT) {
+                    running = false;
+                } else if (event.type == SDL_KEYDOWN) {
+                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        running = false;
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }

@@ -16,20 +16,46 @@
 
 class VKRenderer {
 public:
-    void initialize(SDL_Window* window);
-    void cleanup();
+    VKRenderer(SDL_Window* window);
+    ~VKRenderer();
 
+    /*
+    Begins a new frame.
+    Acquires the swapchain image, begins the command buffer, etc.
+    */
     void beginFrame();
+
+    /*
+    Ends the frame.
+    Submits the command buffer, presents the image, etc.
+    */
     void endFrame();
 
-    bool isInitialized() const { return initialized; };
-
 private:
+
+    /*
+    Creates the Vulkan instance.
+    */
+    void createInstance();
+
+    void setupDebugMessenger();
+
+    bool checkValidationLayerSupport();
+
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData);
+
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 
     SDL_Window* window = nullptr;
     uint32_t currentFrame = 0;
     uint32_t current_frame_start_timestamp = 0;
-    bool initialized = false;
 };
 
 #endif /* VKRENDERER_H */

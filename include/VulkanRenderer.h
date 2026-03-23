@@ -2,7 +2,7 @@
 //  VulkanRenderer.h
 //  dive_engine
 //
-
+#if DONTCOMPILE
 #ifndef VULKANRENDERER_H
 #define VULKANRENDERER_H
 
@@ -103,3 +103,4 @@ private:
 };
 
 #endif /* VULKANRENDERER_H */
+#endif

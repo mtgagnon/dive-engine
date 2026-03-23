@@ -3,6 +3,9 @@
 //  dive_engine
 //
 
+#if DONTCOMPILE
+
+
 #include "VulkanRenderer.h"
 #include "SDL_vulkan.h"
 
@@ -861,3 +864,5 @@ void VulkanRenderer::endFrame() {
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
+
+#endif
