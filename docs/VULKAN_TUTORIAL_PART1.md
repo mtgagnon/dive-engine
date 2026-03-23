@@ -1,28 +1,38 @@
-# Vulkan Tutorial for Dive Engine
+# Vulkan Tutorial for Dive Engine — Part 1: Drawing a Triangle
 
-This tutorial teaches Vulkan from the ground up, using your existing engine code as context. By the end, you'll have a working `VKRenderer` that renders a rotating cube, and understand how to extend it for full 3D actor support.
+This tutorial follows [vulkan-tutorial.com](https://vulkan-tutorial.com/), adapted for the Dive Engine (SDL2 instead of GLFW, building up `VKRenderer`). By the end of Part 1 you will have a hardcoded colorful triangle on screen with validation layers, proper synchronization, and frames in flight.
 
 ## Table of Contents
 
+**Introduction**
 1. [Vulkan vs SDL Renderer: Mental Model Shift](#1-vulkan-vs-sdl-renderer-mental-model-shift)
 2. [Vulkan Architecture Overview](#2-vulkan-architecture-overview)
-3. [Step 1: Instance Creation](#3-step-1-instance-creation)
-4. [Step 2: Surface Creation](#4-step-2-surface-creation)
-5. [Step 3: Physical Device Selection](#5-step-3-physical-device-selection)
-6. [Step 4: Logical Device & Queues](#6-step-4-logical-device--queues)
-7. [Step 5: Swapchain](#7-step-5-swapchain)
-8. [Step 6: Image Views](#8-step-6-image-views)
-9. [Step 7: Render Pass](#9-step-7-render-pass)
-10. [Step 8: Graphics Pipeline & Shaders](#10-step-8-graphics-pipeline--shaders)
-11. [Step 9: Framebuffers](#11-step-9-framebuffers)
-12. [Step 10: Command Pool & Buffers](#12-step-10-command-pool--buffers)
-13. [Step 11: Synchronization](#13-step-11-synchronization)
-14. [Step 12: Vertex Buffers & VMA](#14-step-12-vertex-buffers--vma)
-15. [Step 13: The Render Loop](#15-step-13-the-render-loop)
-16. [Step 14: Uniforms & Push Constants (MVP Matrix)](#16-step-14-uniforms--push-constants-mvp-matrix)
-17. [Step 15: Depth Buffer (3D)](#17-step-15-depth-buffer-3d)
-18. [Step 16: Rendering a Rotating Cube](#18-step-16-rendering-a-rotating-cube)
-19. [Next Steps: 3D Actors](#19-next-steps-3d-actors)
+
+**Setup**
+3. [Base Code](#3-base-code)
+4. [Instance Creation](#4-instance-creation)
+5. [Validation Layers](#5-validation-layers)
+6. [Physical Devices and Queue Families](#6-physical-devices-and-queue-families)
+7. [Logical Device and Queues](#7-logical-device-and-queues)
+
+**Presentation**
+8. [Window Surface](#8-window-surface)
+9. [Swap Chain](#9-swap-chain)
+10. [Image Views](#10-image-views)
+
+**Graphics Pipeline Basics**
+11. [Introduction to the Graphics Pipeline](#11-introduction-to-the-graphics-pipeline)
+12. [Shader Modules](#12-shader-modules)
+13. [Fixed Functions](#13-fixed-functions)
+14. [Render Passes](#14-render-passes)
+15. [Pipeline Conclusion](#15-pipeline-conclusion)
+
+**Drawing**
+16. [Framebuffers](#16-framebuffers)
+17. [Command Buffers](#17-command-buffers)
+18. [Rendering and Presentation](#18-rendering-and-presentation)
+19. [Frames in Flight](#19-frames-in-flight)
+20. [Full Code Checkpoint](#20-full-code-checkpoint)
 
 ---
 
@@ -31,20 +41,18 @@ This tutorial teaches Vulkan from the ground up, using your existing engine code
 ### Your Current SDLRenderer Flow
 
 ```cpp
-// SDLRenderer (simplified)
 SDL_CreateWindow()      // Create window
-SDL_CreateRenderer()    // Create renderer (GPU context hidden from you)
+SDL_CreateRenderer()    // Create renderer (GPU context hidden)
 SDL_RenderClear()       // Clear screen
 SDL_RenderCopy()        // Draw texture
 SDL_RenderPresent()     // Show frame
 ```
 
-SDL hides all GPU details. You just say "draw this texture here" and it happens.
+SDL hides all GPU details. You say "draw this texture here" and it happens.
 
 ### Vulkan Flow
 
 ```cpp
-// VKRenderer (simplified)
 vkCreateInstance()           // Connect to Vulkan driver
 SDL_Vulkan_CreateSurface()   // Create drawable surface
 vkCreateDevice()             // Create logical GPU connection
@@ -66,7 +74,7 @@ vkQueueSubmit()              // Submit to GPU
 vkQueuePresentKHR()          // Present to screen
 ```
 
-**Key difference:** In SDL, you call "draw" and it draws immediately. In Vulkan, you *record* commands into a buffer, then *submit* that buffer to the GPU.
+**Key difference:** In SDL you call "draw" and it draws immediately. In Vulkan you *record* commands into a buffer, then *submit* that buffer to the GPU.
 
 ### Why So Verbose?
 
@@ -76,10 +84,7 @@ Vulkan gives you control over:
 - Pipeline state (shaders, blend modes, depth testing)
 - Command recording (batch many draws efficiently)
 
-This verbosity enables:
-- Better performance (less driver overhead)
-- Predictable behavior (you control everything)
-- Cross-platform consistency (same code everywhere)
+This verbosity enables better performance, predictable behavior, and cross-platform consistency.
 
 ---
 
@@ -134,43 +139,108 @@ This verbosity enables:
 
 ---
 
-## 3. Step 1: Instance Creation
+# Setup
+
+## 3. Base Code
+
+Our `VKRenderer` class mirrors the `SDLRenderer` interface: `initialize`, `cleanup`, `beginFrame`, `endFrame`. We'll build it up incrementally throughout this tutorial.
+
+```cpp
+// VKRenderer.h
+#ifndef VKRENDERER_H
+#define VKRENDERER_H
+
+#include <string>
+#include <vector>
+#include <optional>
+
+#include <vulkan/vulkan.h>
+#include "SDL2/SDL.h"
+
+class VKRenderer {
+public:
+    void initialize(SDL_Window* window);
+    void cleanup();
+
+    void beginFrame();
+    void endFrame();
+
+    bool isInitialized() const { return initialized; }
+
+private:
+    SDL_Window* window = nullptr;
+    bool initialized = false;
+};
+
+#endif
+```
+
+```cpp
+// VKRenderer.cpp
+#include "VKRenderer.h"
+#include "SDL_vulkan.h"
+
+#include <iostream>
+#include <stdexcept>
+
+void VKRenderer::initialize(SDL_Window* win) {
+    window = win;
+    // We'll add create*() calls here as we go
+    initialized = true;
+    std::cout << "VKRenderer initialized!" << std::endl;
+}
+
+void VKRenderer::cleanup() {
+    // We'll add destroy calls here (in reverse order of creation)
+}
+
+void VKRenderer::beginFrame() {}
+void VKRenderer::endFrame() {}
+```
+
+When creating the SDL window, use the `SDL_WINDOW_VULKAN` flag:
+
+```cpp
+SDL_Window* window = SDL_CreateWindow(
+    "Dive Engine",
+    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    800, 600,
+    SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN
+);
+```
+
+### Compare to SDLRenderer
+
+```cpp
+// SDLRenderer creates its GPU context implicitly:
+SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+// VKRenderer will create everything explicitly in initialize()
+```
+
+---
+
+## 4. Instance Creation
 
 The instance connects your app to the Vulkan driver and specifies which extensions you need.
 
 ### Code
 
+Add to `VKRenderer.h` (private section):
+
 ```cpp
-// In VKRenderer.h
-class VKRenderer {
-public:
-    static void initialize(SDL_Window* window);
-    static void cleanup();
-    
-private:
-    static void createInstance();
-    
-    inline static VkInstance instance = VK_NULL_HANDLE;
-    inline static SDL_Window* windowRef = nullptr;
-};
+VkInstance instance = VK_NULL_HANDLE;
+
+void createInstance();
 ```
 
-```cpp
-// In VKRenderer.cpp
-#include "VKRenderer.h"
-#include "SDL_vulkan.h"
-#include <iostream>
-#include <vector>
-#include <stdexcept>
+Add to `VKRenderer.cpp`:
 
-void VKRenderer::initialize(SDL_Window* window) {
-    windowRef = window;
-    createInstance();
-    std::cout << "Vulkan instance created!" << std::endl;
-}
+```cpp
+#include <vector>
+#include <cstring>
 
 void VKRenderer::createInstance() {
-    // App info (optional but good practice)
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Dive Engine";
@@ -178,34 +248,42 @@ void VKRenderer::createInstance() {
     appInfo.pEngineName = "Dive Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_2;
-    
+
     // Get extensions SDL needs for Vulkan surface
     unsigned int extensionCount = 0;
-    SDL_Vulkan_GetInstanceExtensions(windowRef, &extensionCount, nullptr);
+    SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
     std::vector<const char*> extensions(extensionCount);
-    SDL_Vulkan_GetInstanceExtensions(windowRef, &extensionCount, extensions.data());
-    
-    // On macOS, add portability extensions for MoltenVK
+    SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensions.data());
+
     #ifdef __APPLE__
     extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     #endif
-    
-    // Create instance
+
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
-    createInfo.enabledLayerCount = 0;  // Validation layers (debug only)
-    
+    createInfo.enabledLayerCount = 0;
+
     #ifdef __APPLE__
     createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     #endif
-    
+
     if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan instance");
     }
+}
+```
+
+Update `initialize()` and `cleanup()`:
+
+```cpp
+void VKRenderer::initialize(SDL_Window* win) {
+    window = win;
+    createInstance();
+    initialized = true;
 }
 
 void VKRenderer::cleanup() {
@@ -218,183 +296,245 @@ void VKRenderer::cleanup() {
 **`VkApplicationInfo`**: Metadata about your app. Optional but helps drivers optimize.
 
 **Extensions**: Vulkan is modular. The base API is minimal; extensions add features:
-- `VK_KHR_surface` - Window surfaces (SDL requests this)
-- `VK_KHR_win32_surface` / `VK_KHR_xlib_surface` - Platform-specific surface (SDL requests)
-- `VK_KHR_portability_enumeration` - Needed for MoltenVK on macOS
+- `VK_KHR_surface` — window surfaces (SDL requests this automatically)
+- `VK_KHR_portability_enumeration` — needed for MoltenVK on macOS
 
 **`sType`**: Every Vulkan struct has a `sType` field. This enables the driver to validate and version structures.
 
 **`nullptr` allocator**: The last parameter to most `vkCreate*` functions is a custom allocator. We pass `nullptr` to use default allocation.
 
-### Compare to SDL
-
-```cpp
-// SDL: Implicit instance creation
-SDL_Init(SDL_INIT_VIDEO);
-
-// Vulkan: Explicit instance creation
-vkCreateInstance(&createInfo, nullptr, &instance);
-```
-
 ---
 
-## 4. Step 2: Surface Creation
+## 5. Validation Layers
 
-The surface connects Vulkan to your SDL window. This is where SDL helps—it handles platform differences.
+### What Are Validation Layers?
+
+Vulkan's API does minimal error checking by default — even passing null pointers or invalid enums won't produce an error, just crashes or undefined behavior. Validation layers are optional components that hook into Vulkan function calls to catch mistakes:
+
+- Checking parameter values against the specification
+- Tracking object creation/destruction to find resource leaks
+- Logging every call for profiling
+- Detecting thread-safety issues
+
+You enable them during development and disable them for release builds — zero overhead in production.
+
+### Compare to SDL
+
+```
+SDL:    SDL_GetError() returns a string after something fails
+Vulkan: Validation layers actively intercept calls and warn BEFORE crashes
+```
 
 ### Code
 
-```cpp
-// Add to VKRenderer.h
-inline static VkSurfaceKHR surface = VK_NULL_HANDLE;
-static void createSurface();
+Add to `VKRenderer.h` (private section):
 
-// Add to VKRenderer.cpp
-void VKRenderer::createSurface() {
-    if (!SDL_Vulkan_CreateSurface(windowRef, instance, &surface)) {
-        throw std::runtime_error("Failed to create Vulkan surface: " + 
-                                 std::string(SDL_GetError()));
+```cpp
+VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+
+void setupDebugMessenger();
+bool checkValidationLayerSupport();
+void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData);
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+#ifdef NDEBUG
+    const bool enableValidationLayers = false;
+#else
+    const bool enableValidationLayers = true;
+#endif
+
+const std::vector<const char*> validationLayers = {
+    "VK_LAYER_KHRONOS_validation"
+};
+
+// Proxy functions — these extension functions aren't loaded automatically
+VkResult CreateDebugUtilsMessengerEXT(
+    VkInstance instance,
+    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugUtilsMessengerEXT* pDebugMessenger)
+{
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)
+        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    }
+    return VK_ERROR_EXTENSION_NOT_PRESENT;
+}
+
+void DestroyDebugUtilsMessengerEXT(
+    VkInstance instance,
+    VkDebugUtilsMessengerEXT debugMessenger,
+    const VkAllocationCallbacks* pAllocator)
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
+        vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
     }
 }
 
-// Update initialize()
-void VKRenderer::initialize(SDL_Window* window) {
-    windowRef = window;
-    createInstance();
-    createSurface();
-    std::cout << "Vulkan surface created!" << std::endl;
+VKAPI_ATTR VkBool32 VKAPI_CALL VKRenderer::debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+    }
+    return VK_FALSE;
 }
 
-// Update cleanup()
+bool VKRenderer::checkValidationLayerSupport() {
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    for (const char* layerName : validationLayers) {
+        bool found = false;
+        for (const auto& layerProperties : availableLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+
+void VKRenderer::populateDebugMessengerCreateInfo(
+    VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+{
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
+}
+
+void VKRenderer::setupDebugMessenger() {
+    if (!enableValidationLayers) return;
+
+    VkDebugUtilsMessengerCreateInfoEXT createInfo;
+    populateDebugMessengerCreateInfo(createInfo);
+
+    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to set up debug messenger");
+    }
+}
+```
+
+Now update `createInstance()` to enable validation layers and the debug utils extension:
+
+```cpp
+void VKRenderer::createInstance() {
+    if (enableValidationLayers && !checkValidationLayerSupport()) {
+        throw std::runtime_error("Validation layers requested but not available!");
+    }
+
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "Dive Engine";
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.pEngineName = "Dive Engine";
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_2;
+
+    unsigned int sdlExtensionCount = 0;
+    SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, nullptr);
+    std::vector<const char*> extensions(sdlExtensionCount);
+    SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, extensions.data());
+
+    if (enableValidationLayers) {
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+    #ifdef __APPLE__
+    extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+    extensions.push_back("VK_KHR_get_physical_device_properties2");
+    #endif
+
+    VkInstanceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pApplicationInfo = &appInfo;
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.data();
+
+    #ifdef __APPLE__
+    createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+    #endif
+
+    // Enable validation layers and debug messenger for instance creation/destruction
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+    if (enableValidationLayers) {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+        populateDebugMessengerCreateInfo(debugCreateInfo);
+        createInfo.pNext = &debugCreateInfo;
+    } else {
+        createInfo.enabledLayerCount = 0;
+        createInfo.pNext = nullptr;
+    }
+
+    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create Vulkan instance");
+    }
+}
+```
+
+Update `initialize()` and `cleanup()`:
+
+```cpp
+void VKRenderer::initialize(SDL_Window* win) {
+    window = win;
+    createInstance();
+    setupDebugMessenger();
+    initialized = true;
+}
+
 void VKRenderer::cleanup() {
-    vkDestroySurfaceKHR(instance, surface, nullptr);
+    if (enableValidationLayers) {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
     vkDestroyInstance(instance, nullptr);
 }
 ```
 
 ### Key Concepts
 
-**Why SDL helps here**: Without SDL, you'd need platform-specific code:
+**`VK_LAYER_KHRONOS_validation`**: The standard validation layer from the Vulkan SDK that catches most API misuse.
 
-```cpp
-// Linux (X11)
-VkXlibSurfaceCreateInfoKHR createInfo{};
-createInfo.dpy = display;
-createInfo.window = window;
-vkCreateXlibSurfaceKHR(instance, &createInfo, nullptr, &surface);
+**Debug messenger**: An object that receives validation layer messages via your callback. We filter to warnings and errors — verbose messages are usually too noisy.
 
-// Windows
-VkWin32SurfaceCreateInfoKHR createInfo{};
-createInfo.hwnd = hwnd;
-createInfo.hinstance = hinstance;
-vkCreateWin32SurfaceKHR(instance, &createInfo, nullptr, &surface);
+**Proxy functions**: `vkCreateDebugUtilsMessengerEXT` is an extension function, so it isn't loaded automatically. We use `vkGetInstanceProcAddr` to look it up at runtime.
 
-// macOS (Metal via MoltenVK)
-VkMetalSurfaceCreateInfoEXT createInfo{};
-createInfo.pLayer = metalLayer;
-vkCreateMetalSurfaceEXT(instance, &createInfo, nullptr, &surface);
-```
+**`pNext` chain**: Attaching a `VkDebugUtilsMessengerCreateInfoEXT` to the instance create info's `pNext` field lets the validation layer debug the `vkCreateInstance` and `vkDestroyInstance` calls themselves.
 
-SDL's `SDL_Vulkan_CreateSurface()` handles all this for you.
-
-### Compare to SDL
-
-```cpp
-// SDL: Window IS the surface
-SDL_Window* window = SDL_CreateWindow(..., SDL_WINDOW_SHOWN);
-
-// Vulkan: Window and surface are separate
-SDL_Window* window = SDL_CreateWindow(..., SDL_WINDOW_VULKAN);
-SDL_Vulkan_CreateSurface(window, instance, &surface);
-```
+**Install validation layers**: On Linux: `sudo apt install vulkan-validationlayers-dev`
 
 ---
 
-## 5. Step 3: Physical Device Selection
+## 6. Physical Devices and Queue Families
 
-A physical device represents your GPU. You query its capabilities and choose one.
-
-### Code
-
-```cpp
-// Add to VKRenderer.h
-inline static VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-static void pickPhysicalDevice();
-static bool isDeviceSuitable(VkPhysicalDevice device);
-
-// Add to VKRenderer.cpp
-void VKRenderer::pickPhysicalDevice() {
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-    
-    if (deviceCount == 0) {
-        throw std::runtime_error("No GPUs with Vulkan support found");
-    }
-    
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    
-    for (const auto& device : devices) {
-        if (isDeviceSuitable(device)) {
-            physicalDevice = device;
-            break;
-        }
-    }
-    
-    if (physicalDevice == VK_NULL_HANDLE) {
-        throw std::runtime_error("No suitable GPU found");
-    }
-    
-    // Print selected GPU name
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(physicalDevice, &props);
-    std::cout << "Selected GPU: " << props.deviceName << std::endl;
-}
-
-bool VKRenderer::isDeviceSuitable(VkPhysicalDevice device) {
-    // For now, accept any device
-    // We'll add more checks later (queue families, extensions, swapchain support)
-    return true;
-}
-```
-
-### Key Concepts
-
-**Enumeration pattern**: Vulkan uses a common pattern for listing things:
-1. Call with `nullptr` to get count
-2. Allocate array
-3. Call again to fill array
-
-```cpp
-uint32_t count = 0;
-vkEnumerateSomething(handle, &count, nullptr);      // Get count
-std::vector<Thing> things(count);
-vkEnumerateSomething(handle, &count, things.data()); // Fill array
-```
-
-**Physical device properties**: You can query GPU info:
-
-```cpp
-VkPhysicalDeviceProperties props;
-vkGetPhysicalDeviceProperties(device, &props);
-// props.deviceName - GPU name
-// props.deviceType - VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, etc.
-// props.limits - Max texture size, max uniform buffers, etc.
-```
-
-**Device suitability**: In a real app, you'd check:
-- Does it have a graphics queue?
-- Does it support presenting to our surface?
-- Does it support required extensions (swapchain)?
-- Does it have adequate swapchain capabilities?
-
-We'll add these checks as we go.
-
----
-
-## 6. Step 4: Logical Device & Queues
-
-The logical device is your interface to the GPU. Queues are where you submit commands.
+A physical device represents your GPU. You query its capabilities and choose one that supports what you need.
 
 ### Queue Families
 
@@ -404,74 +544,141 @@ GPUs have different types of queues:
 - **Transfer queue**: Memory copies
 - **Present queue**: Presenting to screen
 
-Often the graphics queue can also present, but not always.
+Often the graphics queue can also present, but not always. We need to find queue families that support both.
 
 ### Code
 
-```cpp
-// Add to VKRenderer.h
-#include <optional>
+Add to `VKRenderer.h` (private section):
 
+```cpp
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
-    
+
     bool isComplete() const {
         return graphicsFamily.has_value() && presentFamily.has_value();
     }
 };
 
-inline static VkDevice device = VK_NULL_HANDLE;
-inline static VkQueue graphicsQueue = VK_NULL_HANDLE;
-inline static VkQueue presentQueue = VK_NULL_HANDLE;
+VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-static void createLogicalDevice();
+void pickPhysicalDevice();
+bool isDeviceSuitable(VkPhysicalDevice device);
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 ```
 
-```cpp
-// Add to VKRenderer.cpp
-#include <set>
+Add to `VKRenderer.cpp`:
 
-QueueFamilyIndices VKRenderer::findQueueFamilies(VkPhysicalDevice dev) {
+```cpp
+void VKRenderer::pickPhysicalDevice() {
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+    if (deviceCount == 0) {
+        throw std::runtime_error("No GPUs with Vulkan support found");
+    }
+
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+    for (const auto& device : devices) {
+        if (isDeviceSuitable(device)) {
+            physicalDevice = device;
+            break;
+        }
+    }
+
+    if (physicalDevice == VK_NULL_HANDLE) {
+        throw std::runtime_error("No suitable GPU found");
+    }
+
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(physicalDevice, &props);
+    std::cout << "Selected GPU: " << props.deviceName << std::endl;
+}
+
+VKRenderer::QueueFamilyIndices VKRenderer::findQueueFamilies(VkPhysicalDevice dev) {
     QueueFamilyIndices indices;
-    
+
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, queueFamilies.data());
-    
+
     int i = 0;
     for (const auto& queueFamily : queueFamilies) {
-        // Check for graphics support
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
         }
-        
-        // Check for present support
+
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(dev, i, surface, &presentSupport);
         if (presentSupport) {
             indices.presentFamily = i;
         }
-        
+
         if (indices.isComplete()) break;
         i++;
     }
-    
+
     return indices;
 }
 
+bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
+    QueueFamilyIndices indices = findQueueFamilies(dev);
+    return indices.isComplete();
+}
+```
+
+> **Note:** `findQueueFamilies` references `surface`, which we haven't created yet. We'll add the surface in Section 8. In the init order, surface creation comes before physical device selection.
+
+### Key Concepts
+
+**Enumeration pattern**: Vulkan uses a common two-call pattern for listing things:
+
+```cpp
+uint32_t count = 0;
+vkEnumerateSomething(handle, &count, nullptr);      // Get count
+std::vector<Thing> things(count);
+vkEnumerateSomething(handle, &count, things.data()); // Fill array
+```
+
+**`std::optional`**: Queue family indices are `uint32_t` where any value (including 0) is valid. `std::optional` lets us distinguish "not found" from "found at index 0."
+
+**Device suitability**: We check that the device has both a graphics queue and a present queue. We'll extend this check with swapchain support later.
+
+---
+
+## 7. Logical Device and Queues
+
+The logical device is your interface to the GPU. Queues are where you submit commands.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+VkDevice device = VK_NULL_HANDLE;
+VkQueue graphicsQueue = VK_NULL_HANDLE;
+VkQueue presentQueue = VK_NULL_HANDLE;
+
+void createLogicalDevice();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+#include <set>
+
 void VKRenderer::createLogicalDevice() {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-    
-    // Create queue create infos (one per unique queue family)
+
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         indices.graphicsFamily.value(),
         indices.presentFamily.value()
     };
-    
+
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
@@ -481,19 +688,16 @@ void VKRenderer::createLogicalDevice() {
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
-    
-    // Specify device features we need (none for now)
+
     VkPhysicalDeviceFeatures deviceFeatures{};
-    
-    // Required device extensions
+
     std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         #ifdef __APPLE__
         "VK_KHR_portability_subset",
         #endif
     };
-    
-    // Create the logical device
+
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -501,194 +705,220 @@ void VKRenderer::createLogicalDevice() {
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-    
+
+    if (enableValidationLayers) {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+    } else {
+        createInfo.enabledLayerCount = 0;
+    }
+
     if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device");
     }
-    
-    // Get queue handles
+
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
-}
-
-// Update isDeviceSuitable()
-bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
-    QueueFamilyIndices indices = findQueueFamilies(dev);
-    return indices.isComplete();
-}
-
-// Update initialize()
-void VKRenderer::initialize(SDL_Window* window) {
-    windowRef = window;
-    createInstance();
-    createSurface();
-    pickPhysicalDevice();
-    createLogicalDevice();
-    std::cout << "Vulkan device created!" << std::endl;
-}
-
-// Update cleanup()
-void VKRenderer::cleanup() {
-    vkDestroyDevice(device, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
 }
 ```
 
 ### Key Concepts
 
-**Queue families**: Groups of queues with the same capabilities. You request queues from families.
-
 **Queue priority**: 0.0 to 1.0, affects scheduling. Usually just use 1.0.
 
-**Device extensions**: Like instance extensions, but for device features:
-- `VK_KHR_swapchain` - Required for presenting to screen
+**Device extensions**: `VK_KHR_swapchain` is required for presenting to screen.
 
-**Device features**: GPU capabilities you want to enable (geometry shaders, multi-viewport, etc.). We leave this empty for now.
+**Device features**: GPU capabilities like geometry shaders, multi-viewport, etc. We leave this empty for now.
 
-### Compare to SDL
+**`std::set` for unique families**: If the graphics and present queue families are the same (common), we only create one queue create info.
+
+### Compare to SDLRenderer
 
 ```cpp
-// SDL: Renderer implicitly creates GPU context
+// SDLRenderer: renderer implicitly creates GPU context
 SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-// Vulkan: Explicit device and queue creation
+// Vulkan: explicit device and queue creation
 vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
 vkGetDeviceQueue(device, queueFamily, 0, &graphicsQueue);
 ```
 
 ---
 
-## 7. Step 5: Swapchain
+# Presentation
 
-The swapchain is a queue of images that get presented to the screen. Double or triple buffering.
+## 8. Window Surface
 
-### Why a Swapchain?
+The surface connects Vulkan to your SDL window. This is where SDL helps — it handles all the platform-specific differences.
 
-Without buffering:
-1. GPU writes to screen buffer
-2. Screen reads buffer while GPU writes → tearing
+### Why Surface Before Physical Device?
 
-With double buffering:
-1. GPU writes to back buffer
-2. GPU finishes, swaps buffers
-3. Screen reads front buffer (complete image)
-4. GPU writes to (now back) buffer
+The surface must exist before we select a physical device because `findQueueFamilies` needs it to check for present support. In `initialize()`, the call order is: `createInstance()` → `setupDebugMessenger()` → `createSurface()` → `pickPhysicalDevice()` → `createLogicalDevice()`.
 
 ### Code
 
+Add to `VKRenderer.h` (private section):
+
 ```cpp
-// Add to VKRenderer.h
+VkSurfaceKHR surface = VK_NULL_HANDLE;
+
+void createSurface();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+void VKRenderer::createSurface() {
+    if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
+        throw std::runtime_error("Failed to create Vulkan surface: " +
+                                 std::string(SDL_GetError()));
+    }
+}
+```
+
+### What SDL Hides
+
+Without SDL, you'd need platform-specific code:
+
+```cpp
+// Linux (X11)
+vkCreateXlibSurfaceKHR(instance, &createInfo, nullptr, &surface);
+
+// Windows
+vkCreateWin32SurfaceKHR(instance, &createInfo, nullptr, &surface);
+
+// macOS (Metal via MoltenVK)
+vkCreateMetalSurfaceEXT(instance, &createInfo, nullptr, &surface);
+```
+
+`SDL_Vulkan_CreateSurface()` handles all of this for you.
+
+### Compare to SDLRenderer
+
+```cpp
+// SDLRenderer: the window IS the surface
+SDL_Window* window = SDL_CreateWindow(..., SDL_WINDOW_SHOWN);
+
+// Vulkan: window and surface are separate
+SDL_Window* window = SDL_CreateWindow(..., SDL_WINDOW_VULKAN);
+SDL_Vulkan_CreateSurface(window, instance, &surface);
+```
+
+---
+
+## 9. Swap Chain
+
+The swap chain is a queue of images that get presented to the screen — double or triple buffering.
+
+### Why a Swap Chain?
+
+Without buffering, the GPU writes to the screen buffer while the display reads it, causing tearing. The swap chain provides multiple buffers so the GPU can write to a back buffer while the display reads the front buffer.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
 struct SwapchainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-inline static VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-inline static std::vector<VkImage> swapchainImages;
-inline static VkFormat swapchainImageFormat;
-inline static VkExtent2D swapchainExtent;
+VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+std::vector<VkImage> swapchainImages;
+VkFormat swapchainImageFormat;
+VkExtent2D swapchainExtent;
 
-static SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
-static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
-static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes);
-static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-static void createSwapchain();
+SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
+VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
+VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes);
+VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+void createSwapchain();
 ```
 
+Add to `VKRenderer.cpp`:
+
 ```cpp
-// Add to VKRenderer.cpp
 #include <algorithm>
 #include <limits>
 
-SwapchainSupportDetails VKRenderer::querySwapchainSupport(VkPhysicalDevice dev) {
+VKRenderer::SwapchainSupportDetails VKRenderer::querySwapchainSupport(VkPhysicalDevice dev) {
     SwapchainSupportDetails details;
-    
-    // Get capabilities
+
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev, surface, &details.capabilities);
-    
-    // Get formats
+
     uint32_t formatCount;
     vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &formatCount, nullptr);
     if (formatCount != 0) {
         details.formats.resize(formatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(dev, surface, &formatCount, details.formats.data());
     }
-    
-    // Get present modes
+
     uint32_t presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &presentModeCount, nullptr);
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(dev, surface, &presentModeCount, details.presentModes.data());
     }
-    
+
     return details;
 }
 
 VkSurfaceFormatKHR VKRenderer::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) {
-    // Prefer SRGB color space for gamma-correct rendering
     for (const auto& format : formats) {
         if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
             format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return format;
         }
     }
-    return formats[0];  // Fallback to first available
+    return formats[0];
 }
 
 VkPresentModeKHR VKRenderer::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes) {
-    // VK_PRESENT_MODE_MAILBOX_KHR - Triple buffering (low latency, no tearing)
-    // VK_PRESENT_MODE_FIFO_KHR - VSync (guaranteed available)
-    // VK_PRESENT_MODE_IMMEDIATE_KHR - No sync (tearing possible)
-    
     for (const auto& mode : modes) {
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return mode;
         }
     }
-    return VK_PRESENT_MODE_FIFO_KHR;  // Always available
+    return VK_PRESENT_MODE_FIFO_KHR;
 }
 
 VkExtent2D VKRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     }
-    
-    // Query actual window size
+
     int width, height;
-    SDL_Vulkan_GetDrawableSize(windowRef, &width, &height);
-    
+    SDL_Vulkan_GetDrawableSize(window, &width, &height);
+
     VkExtent2D actualExtent = {
         static_cast<uint32_t>(width),
         static_cast<uint32_t>(height)
     };
-    
-    // Clamp to supported range
+
     actualExtent.width = std::clamp(actualExtent.width,
         capabilities.minImageExtent.width,
         capabilities.maxImageExtent.width);
     actualExtent.height = std::clamp(actualExtent.height,
         capabilities.minImageExtent.height,
         capabilities.maxImageExtent.height);
-    
+
     return actualExtent;
 }
 
 void VKRenderer::createSwapchain() {
     SwapchainSupportDetails support = querySwapchainSupport(physicalDevice);
-    
+
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(support.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(support.presentModes);
     VkExtent2D extent = chooseSwapExtent(support.capabilities);
-    
-    // Request one more image than minimum (for triple buffering)
+
     uint32_t imageCount = support.capabilities.minImageCount + 1;
     if (support.capabilities.maxImageCount > 0 && imageCount > support.capabilities.maxImageCount) {
         imageCount = support.capabilities.maxImageCount;
     }
-    
+
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = surface;
@@ -696,13 +926,12 @@ void VKRenderer::createSwapchain() {
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
-    createInfo.imageArrayLayers = 1;  // Always 1 unless stereoscopic 3D
+    createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    
-    // Handle queue family sharing
+
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
     uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-    
+
     if (indices.graphicsFamily != indices.presentFamily) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
@@ -710,265 +939,185 @@ void VKRenderer::createSwapchain() {
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
-    
+
     createInfo.preTransform = support.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;  // Don't render pixels obscured by other windows
-    createInfo.oldSwapchain = VK_NULL_HANDLE;  // For recreating swapchain (resize)
-    
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create swapchain");
+        throw std::runtime_error("Failed to create swap chain");
     }
-    
-    // Get swapchain images
+
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
     swapchainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data());
-    
+
     swapchainImageFormat = surfaceFormat.format;
     swapchainExtent = extent;
-    
-    std::cout << "Swapchain created with " << imageCount << " images" << std::endl;
+}
+```
+
+Also update `isDeviceSuitable` to verify swap chain support:
+
+```cpp
+bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
+    QueueFamilyIndices indices = findQueueFamilies(dev);
+
+    SwapchainSupportDetails swapchainSupport = querySwapchainSupport(dev);
+    bool swapchainAdequate = !swapchainSupport.formats.empty() &&
+                             !swapchainSupport.presentModes.empty();
+
+    return indices.isComplete() && swapchainAdequate;
 }
 ```
 
 ### Key Concepts
 
-**Surface format**: Pixel format and color space
-- `VK_FORMAT_B8G8R8A8_SRGB` - 8 bits per channel, SRGB color space
+**Surface format**: `VK_FORMAT_B8G8R8A8_SRGB` is 8 bits per channel in SRGB color space — gamma-correct rendering.
 
 **Present modes**:
+
 | Mode | Description |
 |------|-------------|
 | `IMMEDIATE` | No wait, may tear |
-| `FIFO` | VSync, wait for vertical blank |
+| `FIFO` | VSync — guaranteed available |
 | `FIFO_RELAXED` | VSync, but may tear if late |
-| `MAILBOX` | Triple buffer, replace pending image |
+| `MAILBOX` | Triple buffer — low latency, no tearing |
 
-**Extent**: Swapchain image resolution (usually matches window size)
+**Extent**: The swap chain image resolution, usually matching the window size.
 
-**Image sharing**: If graphics and present queues are different families, images need sharing mode.
-
-### Compare to Your Engine's Frame Cycle
-
-```cpp
-// SDLRenderer
-SDL_RenderClear(renderer);    // Clear back buffer
-// ... draw ...
-SDL_RenderPresent(renderer);  // Swap buffers (implicit)
-
-// Vulkan
-vkAcquireNextImageKHR(...);   // Get index of next swapchain image
-// ... record commands to draw to swapchainImages[imageIndex] ...
-vkQueuePresentKHR(...);       // Present that image
-```
+**Image sharing mode**: If graphics and present queues are different families, images need `CONCURRENT` sharing.
 
 ---
 
-## 8. Step 6: Image Views
+## 10. Image Views
 
-Images can't be accessed directly in pipelines. You need an `VkImageView` that describes how to interpret the image data.
+Images can't be accessed directly in pipelines. You need a `VkImageView` that describes how to interpret the image data.
 
 ### Code
 
-```cpp
-// Add to VKRenderer.h
-inline static std::vector<VkImageView> swapchainImageViews;
-static void createImageViews();
+Add to `VKRenderer.h` (private section):
 
-// Add to VKRenderer.cpp
+```cpp
+std::vector<VkImageView> swapchainImageViews;
+
+void createImageViews();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
 void VKRenderer::createImageViews() {
     swapchainImageViews.resize(swapchainImages.size());
-    
+
     for (size_t i = 0; i < swapchainImages.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = swapchainImages[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = swapchainImageFormat;
-        
-        // No swizzling (color channel remapping)
+
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        
-        // Use as color target, no mipmaps, single layer
+
         createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         createInfo.subresourceRange.baseMipLevel = 0;
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
-        
+
         if (vkCreateImageView(device, &createInfo, nullptr, &swapchainImageViews[i]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create image view");
         }
     }
 }
-
-// Update cleanup() - destroy in reverse order of creation
-void VKRenderer::cleanup() {
-    for (auto imageView : swapchainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
-    }
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
-    vkDestroyDevice(device, nullptr);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
-}
 ```
 
 ### Key Concepts
 
-**View type**: How to interpret the image
-- `VK_IMAGE_VIEW_TYPE_2D` - Normal 2D texture
-- `VK_IMAGE_VIEW_TYPE_CUBE` - Cubemap
-- `VK_IMAGE_VIEW_TYPE_2D_ARRAY` - Array of 2D textures
+**View type**: `VK_IMAGE_VIEW_TYPE_2D` for normal textures, `_CUBE` for cubemaps, `_2D_ARRAY` for arrays.
 
-**Subresource range**: Which parts of the image this view accesses
-- `aspectMask` - Color, depth, or stencil
-- `baseMipLevel` / `levelCount` - Which mipmap levels
-- `baseArrayLayer` / `layerCount` - Which array layers
+**Subresource range**: Specifies which parts of the image the view accesses — aspect (color/depth), mip levels, array layers.
 
 ---
 
-## 9. Step 7: Render Pass
+# Graphics Pipeline Basics
 
-A render pass describes:
-- What attachments (color, depth) are used
-- How they're loaded/stored
-- What subpasses (rendering phases) exist
+## 11. Introduction to the Graphics Pipeline
 
-### Code
+The graphics pipeline is the sequence of operations that transform vertices into pixels on screen:
 
-```cpp
-// Add to VKRenderer.h
-inline static VkRenderPass renderPass = VK_NULL_HANDLE;
-static void createRenderPass();
-
-// Add to VKRenderer.cpp
-void VKRenderer::createRenderPass() {
-    // Describe the color attachment (our swapchain image)
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapchainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;  // No multisampling
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear at start
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;  // Keep results
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Don't care about previous contents
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // Ready for presentation
-    
-    // Reference to the attachment from a subpass
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;  // Index in attachment array
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    // The subpass
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    
-    // Subpass dependency (synchronization)
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;  // Before render pass
-    dependency.dstSubpass = 0;  // Our subpass
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
-    // Create render pass
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-    
-    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass");
-    }
-}
+```
+Vertex Data
+    ↓
+┌──────────────────┐
+│  Input Assembler  │  ← Collects vertices, uses index buffer
+└──────────────────┘
+    ↓
+┌──────────────────┐
+│  Vertex Shader    │  ← Transforms positions (model → screen space)  [PROGRAMMABLE]
+└──────────────────┘
+    ↓
+┌──────────────────┐
+│  Rasterization    │  ← Converts triangles to pixel fragments        [FIXED]
+└──────────────────┘
+    ↓
+┌──────────────────┐
+│  Fragment Shader  │  ← Colors each pixel fragment                   [PROGRAMMABLE]
+└──────────────────┘
+    ↓
+┌──────────────────┐
+│  Color Blending   │  ← Combines fragments with framebuffer          [FIXED]
+└──────────────────┘
+    ↓
+  Framebuffer
 ```
 
-### Key Concepts
-
-**Load/Store operations**:
-| loadOp | Description |
-|--------|-------------|
-| `CLEAR` | Clear to a value at start |
-| `LOAD` | Keep existing contents |
-| `DONT_CARE` | Contents undefined (fastest) |
-
-| storeOp | Description |
-|---------|-------------|
-| `STORE` | Keep results |
-| `DONT_CARE` | Contents undefined after |
-
-**Image layouts**: Images must be in specific layouts for different operations:
-- `UNDEFINED` - Don't care (initial state)
-- `COLOR_ATTACHMENT_OPTIMAL` - Best for rendering to
-- `PRESENT_SRC_KHR` - Ready for presentation
-
-**Subpasses**: Multiple rendering phases within a render pass. Useful for deferred rendering. We just have one.
-
-**Dependencies**: Synchronization between subpasses. `VK_SUBPASS_EXTERNAL` refers to commands before/after the render pass.
+**Vulkan pipelines are immutable** — you can't change settings after creation. If you need different shaders or blend modes, create a separate pipeline. This allows the driver to optimize aggressively.
 
 ### Compare to SDL
 
-```cpp
-// SDL: No explicit render pass
-SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-SDL_RenderClear(renderer);
-
-// Vulkan: Render pass defines how rendering happens
-VkRenderPassBeginInfo beginInfo{};
-beginInfo.clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-vkCmdBeginRenderPass(commandBuffer, &beginInfo, ...);
-```
+SDL has no pipeline concept. You just call `SDL_RenderCopy` with whatever texture and blend mode you want. In Vulkan, all rendering state must be baked into a pipeline object upfront.
 
 ---
 
-## 10. Step 8: Graphics Pipeline & Shaders
+## 12. Shader Modules
 
-The graphics pipeline configures everything about how rendering happens:
-- Shaders (vertex, fragment)
-- Vertex input format
-- Rasterization settings
-- Blending
-- Viewport/scissor
+Vulkan uses SPIR-V bytecode, not GLSL directly. You write GLSL, then compile to SPIR-V with `glslc`.
 
-**Vulkan pipelines are immutable** - you can't change settings after creation. Create multiple pipelines for different configurations.
+For Part 1, we hardcode the triangle vertices directly in the vertex shader (matching the official tutorial). We'll move to vertex buffers in Part 2.
 
-### Shaders
+### Vertex Shader (`resources/shaders/hardcoded_triangle.vert`)
 
-Vulkan uses SPIR-V bytecode, not GLSL directly. You write GLSL, then compile to SPIR-V.
-
-**Vertex shader** (`resources/shaders/triangle.vert`):
 ```glsl
 #version 450
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inColor;
-
 layout(location = 0) out vec3 fragColor;
 
-layout(push_constant) uniform PushConstants {
-    mat4 mvp;
-} pushConstants;
+vec2 positions[3] = vec2[](
+    vec2(0.0, -0.5),
+    vec2(0.5, 0.5),
+    vec2(-0.5, 0.5)
+);
+
+vec3 colors[3] = vec3[](
+    vec3(1.0, 0.0, 0.0),
+    vec3(0.0, 1.0, 0.0),
+    vec3(0.0, 0.0, 1.0)
+);
 
 void main() {
-    gl_Position = pushConstants.mvp * vec4(inPosition, 1.0);
-    fragColor = inColor;
+    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+    fragColor = colors[gl_VertexIndex];
 }
 ```
 
-**Fragment shader** (`resources/shaders/triangle.frag`):
+### Fragment Shader (`resources/shaders/hardcoded_triangle.frag`)
+
 ```glsl
 #version 450
 
@@ -980,83 +1129,41 @@ void main() {
 }
 ```
 
-**Compile to SPIR-V**:
+### Compile to SPIR-V
+
 ```bash
-glslc resources/shaders/triangle.vert -o resources/shaders/triangle.vert.spv
-glslc resources/shaders/triangle.frag -o resources/shaders/triangle.frag.spv
+glslc resources/shaders/hardcoded_triangle.vert -o resources/shaders/hardcoded_triangle.vert.spv
+glslc resources/shaders/hardcoded_triangle.frag -o resources/shaders/hardcoded_triangle.frag.spv
 ```
 
-### Vertex Structure
+### Loading Shader Code
+
+Add to `VKRenderer.h` (private section):
 
 ```cpp
-// Add to VKRenderer.h
-#include "glm/glm.hpp"
-#include <array>
-
-struct Vertex {
-    glm::vec3 position;
-    glm::vec3 color;
-    
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        return bindingDescription;
-    }
-    
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 2> attrs{};
-        
-        // Position
-        attrs[0].binding = 0;
-        attrs[0].location = 0;  // layout(location = 0)
-        attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // vec3
-        attrs[0].offset = offsetof(Vertex, position);
-        
-        // Color
-        attrs[1].binding = 0;
-        attrs[1].location = 1;  // layout(location = 1)
-        attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // vec3
-        attrs[1].offset = offsetof(Vertex, color);
-        
-        return attrs;
-    }
-};
-
-struct PushConstants {
-    glm::mat4 mvp;
-};
-```
-
-### Pipeline Code
-
-```cpp
-// Add to VKRenderer.h
-inline static VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-inline static VkPipeline graphicsPipeline = VK_NULL_HANDLE;
-
 static std::vector<char> readFile(const std::string& filename);
-static VkShaderModule createShaderModule(const std::vector<char>& code);
-static void createGraphicsPipeline();
+VkShaderModule createShaderModule(const std::vector<char>& code);
+```
 
-// Add to VKRenderer.cpp
+Add to `VKRenderer.cpp`:
+
+```cpp
 #include <fstream>
 
 std::vector<char> VKRenderer::readFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    
+
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file: " + filename);
     }
-    
+
     size_t fileSize = static_cast<size_t>(file.tellg());
     std::vector<char> buffer(fileSize);
-    
+
     file.seekg(0);
     file.read(buffer.data(), fileSize);
     file.close();
-    
+
     return buffer;
 }
 
@@ -1065,72 +1172,276 @@ VkShaderModule VKRenderer::createShaderModule(const std::vector<char>& code) {
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-    
+
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create shader module");
     }
-    
+
     return shaderModule;
 }
+```
 
+### Key Concepts
+
+**`gl_VertexIndex`**: Built-in variable that tells the vertex shader which vertex is being processed (0, 1, or 2 for our triangle).
+
+**Shader modules are temporary**: You create them to build the pipeline, then destroy them immediately after. The pipeline keeps its own copy of the compiled code.
+
+**SPIR-V**: An intermediate representation that all Vulkan drivers understand. Write GLSL, compile once, run anywhere.
+
+---
+
+## 13. Fixed Functions
+
+The non-programmable pipeline stages are configured through structs. Even though vertices are hardcoded in the shader, we still need to configure these stages.
+
+All of the following code goes inside `createGraphicsPipeline()`, which we'll assemble in Section 15.
+
+### Vertex Input (empty for now)
+
+Since our vertices are hardcoded in the shader, we tell the pipeline there's no vertex input:
+
+```cpp
+VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+vertexInputInfo.vertexBindingDescriptionCount = 0;
+vertexInputInfo.vertexAttributeDescriptionCount = 0;
+```
+
+### Input Assembly
+
+How vertices form primitives:
+
+```cpp
+VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+inputAssembly.primitiveRestartEnable = VK_FALSE;
+```
+
+### Dynamic State
+
+Viewport and scissor are set at draw time so we don't need to recreate the pipeline on window resize:
+
+```cpp
+std::vector<VkDynamicState> dynamicStates = {
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_SCISSOR
+};
+
+VkPipelineDynamicStateCreateInfo dynamicState{};
+dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+dynamicState.pDynamicStates = dynamicStates.data();
+
+VkPipelineViewportStateCreateInfo viewportState{};
+viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+viewportState.viewportCount = 1;
+viewportState.scissorCount = 1;
+```
+
+### Rasterizer
+
+```cpp
+VkPipelineRasterizationStateCreateInfo rasterizer{};
+rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+rasterizer.depthClampEnable = VK_FALSE;
+rasterizer.rasterizerDiscardEnable = VK_FALSE;
+rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+rasterizer.lineWidth = 1.0f;
+rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+rasterizer.depthBiasEnable = VK_FALSE;
+```
+
+### Multisampling (disabled)
+
+```cpp
+VkPipelineMultisampleStateCreateInfo multisampling{};
+multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+multisampling.sampleShadingEnable = VK_FALSE;
+multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+```
+
+### Color Blending
+
+```cpp
+VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+colorBlendAttachment.colorWriteMask =
+    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+colorBlendAttachment.blendEnable = VK_FALSE;
+
+VkPipelineColorBlendStateCreateInfo colorBlending{};
+colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+colorBlending.logicOpEnable = VK_FALSE;
+colorBlending.attachmentCount = 1;
+colorBlending.pAttachments = &colorBlendAttachment;
+```
+
+### Pipeline Layout (empty for now)
+
+We'll add push constants in Part 2. For now, it's empty:
+
+```cpp
+VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+pipelineLayoutInfo.setLayoutCount = 0;
+pipelineLayoutInfo.pushConstantRangeCount = 0;
+```
+
+---
+
+## 14. Render Passes
+
+A render pass describes what attachments (color, depth) are used, how they're loaded/stored, and what subpasses exist.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+VkRenderPass renderPass = VK_NULL_HANDLE;
+
+void createRenderPass();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+void VKRenderer::createRenderPass() {
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = swapchainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create render pass");
+    }
+}
+```
+
+### Key Concepts
+
+**Load/Store operations**:
+
+| loadOp | Description |
+|--------|-------------|
+| `CLEAR` | Clear to a value at start |
+| `LOAD` | Preserve existing contents |
+| `DONT_CARE` | Contents undefined (fastest) |
+
+| storeOp | Description |
+|---------|-------------|
+| `STORE` | Keep results |
+| `DONT_CARE` | Contents undefined after |
+
+**Image layouts**: Images must be in specific layouts for different operations:
+- `UNDEFINED` — don't care about previous contents
+- `COLOR_ATTACHMENT_OPTIMAL` — best for rendering to
+- `PRESENT_SRC_KHR` — ready for presentation
+
+**Subpass dependency**: `VK_SUBPASS_EXTERNAL` refers to commands before the render pass. The dependency ensures the swap chain image transition happens before we try to write to it.
+
+---
+
+## 15. Pipeline Conclusion
+
+Now we assemble everything from the previous sections into `createGraphicsPipeline()`.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+
+void createGraphicsPipeline();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
 void VKRenderer::createGraphicsPipeline() {
-    // Load shaders
-    auto vertShaderCode = readFile("resources/shaders/triangle.vert.spv");
-    auto fragShaderCode = readFile("resources/shaders/triangle.frag.spv");
-    
+    auto vertShaderCode = readFile("resources/shaders/hardcoded_triangle.vert.spv");
+    auto fragShaderCode = readFile("resources/shaders/hardcoded_triangle.frag.spv");
+
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-    
-    // Shader stages
+
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertShaderStageInfo.module = vertShaderModule;
-    vertShaderStageInfo.pName = "main";  // Entry point
-    
+    vertShaderStageInfo.pName = "main";
+
     VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
-    
+
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-    
-    // Vertex input
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescriptions = Vertex::getAttributeDescriptions();
-    
+
+    // Vertex input — empty, vertices are hardcoded in the shader
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-    
-    // Input assembly (how vertices form primitives)
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
-    
-    // Dynamic viewport and scissor (set at draw time)
+
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };
-    
+
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
-    
+
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
-    
-    // Rasterizer
+
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
@@ -1138,44 +1449,35 @@ void VKRenderer::createGraphicsPipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
-    
-    // Multisampling (disabled)
+
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    
-    // Color blending
+
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;  // No blending for now
-    
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
-    
-    // Push constants (for MVP matrix)
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstants);
-    
-    // Pipeline layout
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout");
     }
-    
-    // Create the pipeline
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -1190,31 +1492,526 @@ void VKRenderer::createGraphicsPipeline() {
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
-    
+
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline");
     }
-    
-    // Shader modules can be destroyed after pipeline creation
+
     vkDestroyShaderModule(device, fragShaderModule, nullptr);
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 ```
 
+---
+
+# Drawing
+
+## 16. Framebuffers
+
+A framebuffer connects your render pass to actual images. Each swap chain image needs its own framebuffer.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+std::vector<VkFramebuffer> swapchainFramebuffers;
+
+void createFramebuffers();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+void VKRenderer::createFramebuffers() {
+    swapchainFramebuffers.resize(swapchainImageViews.size());
+
+    for (size_t i = 0; i < swapchainImageViews.size(); i++) {
+        VkImageView attachments[] = { swapchainImageViews[i] };
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapchainExtent.width;
+        framebufferInfo.height = swapchainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create framebuffer");
+        }
+    }
+}
+```
+
 ### Key Concepts
 
-**Shader modules**: Compiled SPIR-V loaded into Vulkan. Temporary—destroy after pipeline creation.
+**One framebuffer per swap chain image**: If you have 3 swap chain images (triple buffering), you create 3 framebuffers.
 
-**Vertex input**: Describes how vertex data is laid out in memory.
-
-**Input assembly**: How vertices form primitives (triangles, lines, points).
-
-**Rasterization**: Fill mode, culling, front face winding.
-
-**Dynamic state**: Some pipeline state can be changed at draw time without recreating the pipeline.
-
-**Push constants**: Small, fast data sent to shaders every draw call. Perfect for MVP matrix.
+**Attachment order**: The `pAttachments` array must match the order of attachments in the render pass. When you add a depth buffer later (Part 3), you'll pass two attachments.
 
 ---
 
-**Continue to [Part 2: Framebuffers, Commands, Render Loop & 3D](VULKAN_TUTORIAL_PART2.md)**
+## 17. Command Buffers
+
+Commands in Vulkan aren't executed immediately. You record them into a command buffer, then submit that buffer to a queue.
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
+VkCommandPool commandPool = VK_NULL_HANDLE;
+std::vector<VkCommandBuffer> commandBuffers;
+
+void createCommandPool();
+void createCommandBuffers();
+void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+void VKRenderer::createCommandPool() {
+    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = indices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool");
+    }
+}
+
+void VKRenderer::createCommandBuffers() {
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+
+    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffers");
+    }
+}
+
+void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapchainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapchainExtent;
+
+    VkClearValue clearColor = {{{0.1f, 0.1f, 0.15f, 1.0f}}};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapchainExtent.width);
+    viewport.height = static_cast<float>(swapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkScissor scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to record command buffer");
+    }
+}
+```
+
+### Key Concepts
+
+**`RESET_COMMAND_BUFFER_BIT`**: Allows individual command buffers to be reset and re-recorded each frame.
+
+**Primary vs Secondary**: Primary buffers are submitted directly to queues. Secondary buffers are called from primary buffers (useful for multi-threaded recording).
+
+**`vkCmdDraw(commandBuffer, 3, 1, 0, 0)`**: Draw 3 vertices, 1 instance, starting from vertex 0.
+
+### Compare to SDLRenderer
+
+```
+SDLRenderer: "Draw this now"
+  SDL_RenderCopy(renderer, texture, &src, &dst);
+
+Vulkan: "Record this command, I'll submit it later"
+  vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
+```
+
+---
+
+## 18. Rendering and Presentation
+
+Now we implement `beginFrame()` and `endFrame()` — the core frame loop.
+
+### Synchronization Primitives
+
+| Primitive | Scope | Use Case |
+|-----------|-------|----------|
+| **Fence** | CPU ↔ GPU | CPU waits for GPU to finish a frame |
+| **Semaphore** | GPU ↔ GPU | Signal between queue operations |
+
+### The Frame Sync Flow
+
+```
+1. CPU: Wait for fence[N]          (GPU finished with this frame slot)
+2. CPU: Acquire next swap chain image   (signals imageAvailable semaphore)
+3. CPU: Reset and record commands
+4. CPU: Submit to graphics queue
+         Wait on:  imageAvailable       (don't render until image ready)
+         Signal:   renderFinished       (rendering done)
+         Signal:   fence[N]             (CPU can track completion)
+5. CPU: Present the image
+         Wait on:  renderFinished       (don't present until rendered)
+```
+
+### Code
+
+Add to `VKRenderer.h` (private section):
+
+```cpp
+std::vector<VkSemaphore> imageAvailableSemaphores;
+std::vector<VkSemaphore> renderFinishedSemaphores;
+std::vector<VkFence> inFlightFences;
+uint32_t currentFrame = 0;
+uint32_t currentImageIndex = 0;
+
+void createSyncObjects();
+```
+
+Add to `VKRenderer.cpp`:
+
+```cpp
+void VKRenderer::createSyncObjects() {
+    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create sync objects");
+        }
+    }
+}
+```
+
+Now implement `beginFrame()` and `endFrame()`:
+
+```cpp
+void VKRenderer::beginFrame() {
+    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+        imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &currentImageIndex);
+
+    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+    recordCommandBuffer(commandBuffers[currentFrame], currentImageIndex);
+}
+
+void VKRenderer::endFrame() {
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to submit draw command buffer");
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapchains[] = { swapchain };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapchains;
+    presentInfo.pImageIndices = &currentImageIndex;
+
+    vkQueuePresentKHR(presentQueue, &presentInfo);
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+```
+
+### Key Concepts
+
+**`VK_FENCE_CREATE_SIGNALED_BIT`**: Fences start signaled so the first frame doesn't deadlock waiting for a previous frame that never existed.
+
+**Why 2 of everything**: With `MAX_FRAMES_IN_FLIGHT = 2`, the CPU can prepare frame N+1 while the GPU works on frame N.
+
+**Semaphores vs Fences**:
+- Semaphores: GPU-to-GPU sync. The CPU never waits on them.
+- Fences: GPU-to-CPU sync. The CPU calls `vkWaitForFences` to block.
+
+### Compare to SDLRenderer
+
+```
+SDLRenderer: SDL_RenderPresent handles everything
+  SDL_RenderPresent(renderer);
+
+Vulkan: you manage all synchronization
+  vkWaitForFences(...)
+  vkAcquireNextImageKHR(...)
+  vkQueueSubmit(...)
+  vkQueuePresentKHR(...)
+```
+
+---
+
+## 19. Frames in Flight
+
+The sync objects and double-buffering pattern from Section 18 implement "frames in flight." With `MAX_FRAMES_IN_FLIGHT = 2`:
+
+- Frame slot 0 and frame slot 1 alternate
+- Each has its own command buffer, semaphores, and fence
+- The CPU can prepare the next frame while the GPU renders the current one
+- `currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT` rotates between slots
+
+This is already implemented above. The key insight is that `MAX_FRAMES_IN_FLIGHT` controls how far ahead the CPU can get. Setting it to 1 means the CPU blocks every frame. Setting it to 2 means the CPU can be one frame ahead.
+
+---
+
+## 20. Full Code Checkpoint
+
+At this point, your `initialize()` and `cleanup()` should look like this:
+
+### `VKRenderer.h`
+
+```cpp
+#ifndef VKRENDERER_H
+#define VKRENDERER_H
+
+#include <string>
+#include <vector>
+#include <optional>
+
+#include <vulkan/vulkan.h>
+#include "SDL2/SDL.h"
+
+class VKRenderer {
+public:
+    void initialize(SDL_Window* window);
+    void cleanup();
+
+    void beginFrame();
+    void endFrame();
+
+    bool isInitialized() const { return initialized; }
+
+private:
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
+        bool isComplete() const {
+            return graphicsFamily.has_value() && presentFamily.has_value();
+        }
+    };
+
+    struct SwapchainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
+    SDL_Window* window = nullptr;
+    bool initialized = false;
+
+    // Vulkan core objects
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+    VkQueue presentQueue = VK_NULL_HANDLE;
+
+    // Swap chain
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    std::vector<VkImage> swapchainImages;
+    VkFormat swapchainImageFormat;
+    VkExtent2D swapchainExtent;
+    std::vector<VkImageView> swapchainImageViews;
+
+    // Pipeline
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+
+    // Drawing
+    std::vector<VkFramebuffer> swapchainFramebuffers;
+    VkCommandPool commandPool = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> commandBuffers;
+
+    // Sync
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    uint32_t currentFrame = 0;
+    uint32_t currentImageIndex = 0;
+
+    // Setup
+    void createInstance();
+    void setupDebugMessenger();
+    void createSurface();
+    void pickPhysicalDevice();
+    void createLogicalDevice();
+
+    // Presentation
+    void createSwapchain();
+    void createImageViews();
+
+    // Pipeline
+    void createRenderPass();
+    void createGraphicsPipeline();
+
+    // Drawing
+    void createFramebuffers();
+    void createCommandPool();
+    void createCommandBuffers();
+    void createSyncObjects();
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
+    // Helpers
+    bool checkValidationLayerSupport();
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+    bool isDeviceSuitable(VkPhysicalDevice device);
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+    SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes);
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+    static std::vector<char> readFile(const std::string& filename);
+    VkShaderModule createShaderModule(const std::vector<char>& code);
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData);
+};
+
+#endif
+```
+
+### `VKRenderer::initialize()` and `VKRenderer::cleanup()`
+
+```cpp
+void VKRenderer::initialize(SDL_Window* win) {
+    window = win;
+
+    createInstance();
+    setupDebugMessenger();
+    createSurface();
+    pickPhysicalDevice();
+    createLogicalDevice();
+    createSwapchain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+    createCommandPool();
+    createCommandBuffers();
+    createSyncObjects();
+
+    initialized = true;
+    std::cout << "VKRenderer initialized!" << std::endl;
+}
+
+void VKRenderer::cleanup() {
+    vkDeviceWaitIdle(device);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(device, inFlightFences[i], nullptr);
+    }
+
+    vkDestroyCommandPool(device, commandPool, nullptr);
+
+    for (auto framebuffer : swapchainFramebuffers) {
+        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    }
+
+    vkDestroyPipeline(device, graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyRenderPass(device, renderPass, nullptr);
+
+    for (auto imageView : swapchainImageViews) {
+        vkDestroyImageView(device, imageView, nullptr);
+    }
+
+    vkDestroySwapchainKHR(device, swapchain, nullptr);
+    vkDestroyDevice(device, nullptr);
+
+    if (enableValidationLayers) {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
+
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyInstance(instance, nullptr);
+}
+```
+
+### Destruction Order
+
+Destroy in reverse order of creation. If object A was needed to create object B, destroy B before A.
+
+### What You Should See
+
+After compiling the shaders and running the program, you should see a colorful triangle (red, green, blue vertices) on a dark background.
+
+---
+
+**Continue to [Part 2: Working with Data — Vertex Buffers, Uniforms & Textures](VULKAN_TUTORIAL_PART2.md)**
