@@ -82,11 +82,26 @@ private:
      */
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
+    /**
+     * @brief Picks the first suitable physical device to use.
+     TODO: Add more sophisticated picking logic. Possibly support multiple GPUs.
+     */
     void pickPhysicalDevice();
 
+    /**
+     * @brief Checks if the device is suitable.
+     * @param device The device to check.
+     * @return True if the device is suitable.
+     */
     bool isDeviceSuitable(VkPhysicalDevice device);
 
+    /**
+     * @brief Finds the queue families for the device.
+     * @param device The device to find the queue families for.
+     * @return The queue families.
+     */
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+
     // ------- Static Functions -------
 
     /**
@@ -148,7 +163,7 @@ private:
     VkInstance instance = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
     VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // TODO RAII this as a struct/class member
-
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
 
     SDL_Window* window = nullptr;
     uint32_t currentFrame = 0;
