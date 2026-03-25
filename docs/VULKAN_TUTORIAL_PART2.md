@@ -168,6 +168,8 @@ void createVertexBuffer();
 
 Add to `VKRenderer.cpp`:
 
+The VMA allocator wraps Vulkan's memory allocation API. It needs handles to the physical device (to query memory properties), logical device (to allocate memory), and instance (for Vulkan version info):
+
 ```cpp
 void VKRenderer::createVmaAllocator() {
     VmaAllocatorCreateInfo allocatorInfo{};
@@ -180,7 +182,11 @@ void VKRenderer::createVmaAllocator() {
         throw std::runtime_error("Failed to create VMA allocator");
     }
 }
+```
 
+`createVertexBuffer` starts with our triangle data and a standard `VkBufferCreateInfo`. `VERTEX_BUFFER_BIT` tells Vulkan how the buffer will be used, which helps the driver choose optimal memory placement. `EXCLUSIVE` sharing mode means only one queue family accesses this buffer:
+
+```cpp
 void VKRenderer::createVertexBuffer() {
     const std::vector<Vertex> vertices = {
         {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -195,7 +201,11 @@ void VKRenderer::createVertexBuffer() {
     bufferInfo.size = bufferSize;
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+```
 
+The VMA allocation info controls where the buffer lives in memory. `VMA_MEMORY_USAGE_AUTO` lets VMA choose the best memory type. `HOST_ACCESS_SEQUENTIAL_WRITE_BIT` hints that the CPU will write to this buffer sequentially (not randomly). `MAPPED_BIT` keeps the buffer permanently mapped — `allocationInfo.pMappedData` is a CPU-visible pointer we can `memcpy` into directly, avoiding explicit `vkMapMemory`/`vkUnmapMemory` calls:
+
+```cpp
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
     allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
@@ -279,6 +289,8 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
 Add to `VKRenderer.cpp`:
 
+`beginSingleTimeCommands` allocates a temporary command buffer for one-shot operations like memory copies. `ONE_TIME_SUBMIT_BIT` tells the driver this buffer will be submitted once and then discarded, enabling potential optimizations:
+
 ```cpp
 VkCommandBuffer VKRenderer::beginSingleTimeCommands() {
     VkCommandBufferAllocateInfo allocInfo{};
@@ -297,7 +309,11 @@ VkCommandBuffer VKRenderer::beginSingleTimeCommands() {
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
     return commandBuffer;
 }
+```
 
+`endSingleTimeCommands` finalizes the buffer, submits it, and waits for the GPU to finish. `vkQueueWaitIdle` is a simple but blocking synchronization — fine during initialization, but in a production engine you'd use fences to avoid stalling the CPU during gameplay:
+
+```cpp
 void VKRenderer::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
 
@@ -315,7 +331,7 @@ void VKRenderer::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
 
 ### Staged Vertex Buffer Creation
 
-Replace `createVertexBuffer()` with a staged version:
+Replace `createVertexBuffer()` with a staged version. The staging buffer lives in host-visible memory with `TRANSFER_SRC_BIT` — it's a temporary holding area the CPU can write to:
 
 ```cpp
 void VKRenderer::createVertexBuffer() {
@@ -327,7 +343,6 @@ void VKRenderer::createVertexBuffer() {
 
     VkDeviceSize bufferSize = sizeof(Vertex) * vertices.size();
 
-    // Staging buffer (host-visible)
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
     VmaAllocationInfo stagingAllocInfo;
@@ -346,8 +361,11 @@ void VKRenderer::createVertexBuffer() {
                     &stagingBuffer, &stagingAllocation, &stagingAllocInfo);
 
     memcpy(stagingAllocInfo.pMappedData, vertices.data(), bufferSize);
+```
 
-    // Device-local buffer (fast GPU memory)
+The final vertex buffer lives in device-local memory — the fastest memory type for the GPU, but not directly accessible by the CPU. `TRANSFER_DST_BIT` marks it as a copy destination, and `VERTEX_BUFFER_BIT` marks its intended use. `DEDICATED_MEMORY_BIT` asks VMA to allocate its own `VkDeviceMemory` block for this buffer (best for large, long-lived resources):
+
+```cpp
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = bufferSize;
@@ -359,8 +377,11 @@ void VKRenderer::createVertexBuffer() {
 
     vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocCreateInfo,
                     &vertexBuffer, &vertexBufferAllocation, nullptr);
+```
 
-    // Copy staging -> device-local
+The GPU copy command transfers data from the staging buffer to the device-local buffer. After the copy finishes, the staging buffer is destroyed — it served its purpose:
+
+```cpp
     VkCommandBuffer cmd = beginSingleTimeCommands();
     VkBufferCopy copyRegion{};
     copyRegion.size = bufferSize;
@@ -397,7 +418,7 @@ uint32_t indexCount = 0;
 void createIndexBuffer();
 ```
 
-Update the vertex data to form a quad and add `createIndexBuffer()`:
+Update the vertex data to form a quad (4 vertices for a rectangle):
 
 ```cpp
 void VKRenderer::createVertexBuffer() {
@@ -409,7 +430,11 @@ void VKRenderer::createVertexBuffer() {
     };
     // ... same staging buffer pattern as above ...
 }
+```
 
+`createIndexBuffer` follows the same staging pattern. The index data uses `uint16_t` — 16-bit indices support up to 65,535 unique vertices, which is enough for most meshes. Use `uint32_t` (and `VK_INDEX_TYPE_UINT32`) for larger models. The indices `{0, 1, 2, 2, 3, 0}` define two triangles that together form our quad:
+
+```cpp
 void VKRenderer::createIndexBuffer() {
     const std::vector<uint16_t> indices = {
         0, 1, 2,
@@ -419,7 +444,6 @@ void VKRenderer::createIndexBuffer() {
     indexCount = static_cast<uint32_t>(indices.size());
     VkDeviceSize bufferSize = sizeof(uint16_t) * indices.size();
 
-    // Staging buffer
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
     VmaAllocationInfo stagingAllocInfo;
@@ -437,8 +461,11 @@ void VKRenderer::createIndexBuffer() {
     vmaCreateBuffer(vmaAllocator, &stagingBufferInfo, &stagingAllocCreateInfo,
                     &stagingBuffer, &stagingAllocation, &stagingAllocInfo);
     memcpy(stagingAllocInfo.pMappedData, indices.data(), bufferSize);
+```
 
-    // Device-local index buffer
+The device-local index buffer uses `INDEX_BUFFER_BIT` instead of `VERTEX_BUFFER_BIT` — otherwise the pattern is identical to the vertex buffer:
+
+```cpp
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = bufferSize;
@@ -463,7 +490,7 @@ void VKRenderer::createIndexBuffer() {
 
 ### Update recordCommandBuffer
 
-After binding the vertex buffer, bind the index buffer and use `vkCmdDrawIndexed`:
+After binding the vertex buffer, bind the index buffer and switch from `vkCmdDraw` to `vkCmdDrawIndexed`. The parameters are: index count, instance count, first index, vertex offset, first instance. The vertex offset is useful when multiple meshes share a single vertex buffer:
 
 ```cpp
 vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -471,12 +498,6 @@ vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
 ```
 
 Remove the old `vkCmdDraw` call.
-
-### Key Concepts
-
-**Index buffers save memory**: A quad has 4 unique vertices but 6 index entries (2 triangles x 3). Without indexing you'd need 6 vertices with duplicate data.
-
-**`VK_INDEX_TYPE_UINT16`**: 16-bit indices support up to 65535 vertices. Use `UINT32` for larger meshes.
 
 ---
 
@@ -657,6 +678,8 @@ void createUniformBuffers();
 void updateUniformBuffer(uint32_t currentImage);
 ```
 
+We create one uniform buffer per frame in flight — since the CPU updates the buffer each frame, we need separate copies so we don't overwrite data the GPU is still reading. `UNIFORM_BUFFER_BIT` marks the buffer for use as a uniform buffer. We keep them persistently mapped (`MAPPED_BIT`) since we update them every frame:
+
 ```cpp
 void VKRenderer::createUniformBuffers() {
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -682,7 +705,11 @@ void VKRenderer::createUniformBuffers() {
         uniformBuffersMapped[i] = allocationInfo.pMappedData;
     }
 }
+```
 
+`updateUniformBuffer` writes the current view and projection matrices into the mapped buffer. This is called each frame from `beginFrame()`. The view and projection stay in the uniform buffer (updated once per frame), while the model matrix goes through push constants (updated per draw call) — a common split in engine design:
+
+```cpp
 void VKRenderer::updateUniformBuffer(uint32_t frameIndex) {
     float aspect = static_cast<float>(swapchainExtent.width) /
                    static_cast<float>(swapchainExtent.height);
@@ -714,6 +741,8 @@ void createDescriptorPool();
 void createDescriptorSets();
 ```
 
+The descriptor pool pre-allocates memory for descriptor sets — you tell it how many descriptors of each type you'll need. `poolSize` says we need `MAX_FRAMES_IN_FLIGHT` uniform buffer descriptors. `maxSets` limits the total number of descriptor sets that can be allocated from this pool:
+
 ```cpp
 void VKRenderer::createDescriptorPool() {
     VkDescriptorPoolSize poolSize{};
@@ -730,7 +759,11 @@ void VKRenderer::createDescriptorPool() {
         throw std::runtime_error("Failed to create descriptor pool");
     }
 }
+```
 
+Allocating descriptor sets requires a vector of layouts — one layout per set. We duplicate the same layout for each frame in flight. Descriptor sets are not individually freed; they're all released when the pool is destroyed or reset:
+
+```cpp
 void VKRenderer::createDescriptorSets() {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 
@@ -744,7 +777,11 @@ void VKRenderer::createDescriptorSets() {
     if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate descriptor sets");
     }
+```
 
+After allocation, each descriptor set is empty — we need to write the actual buffer references into them. `VkWriteDescriptorSet` connects a descriptor set binding to a concrete buffer. `dstBinding = 0` matches `binding = 0` in the shader and layout. `dstArrayElement = 0` is the first element in the binding (relevant for arrays of descriptors). Each frame's descriptor set points to that frame's uniform buffer:
+
+```cpp
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = uniformBuffers[i];
@@ -767,18 +804,12 @@ void VKRenderer::createDescriptorSets() {
 
 ### Binding Descriptor Sets in recordCommandBuffer
 
+In the command buffer, bind the current frame's descriptor set before drawing. The parameters to `vkCmdBindDescriptorSets` are: the command buffer, bind point (graphics vs compute), pipeline layout, first set index (0), set count (1), the set pointer, and dynamic offset count/values (0 and nullptr since we're not using dynamic offsets):
+
 ```cpp
 vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
     pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 ```
-
-### Key Concepts
-
-**Descriptor pool**: Pre-allocates descriptor memory. You specify how many of each type you need.
-
-**Descriptor sets are not freed individually**: They're returned when the pool is destroyed or reset.
-
-**Per-frame sets**: Each frame in flight gets its own descriptor set pointing to its own uniform buffer, avoiding data races.
 
 ---
 
@@ -811,6 +842,8 @@ void transitionImageLayout(VkImage image, VkFormat format,
 void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 ```
 
+`transitionImageLayout` uses a pipeline barrier to change an image's memory layout. Vulkan images must be in specific layouts for different operations — you can't copy into an image that's in `UNDEFINED` layout or sample from one that's in `TRANSFER_DST_OPTIMAL`. The `VkImageMemoryBarrier` specifies the old and new layouts, and which parts of the image are affected. `srcQueueFamilyIndex` / `dstQueueFamilyIndex` are for transferring ownership between queue families — `VK_QUEUE_FAMILY_IGNORED` means no transfer:
+
 ```cpp
 void VKRenderer::transitionImageLayout(VkImage image, VkFormat format,
     VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -829,7 +862,14 @@ void VKRenderer::transitionImageLayout(VkImage image, VkFormat format,
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
+```
 
+The `srcAccessMask` / `dstAccessMask` and stage flags define what operations must complete before the transition and what operations can proceed after. We handle two transitions:
+
+1. **UNDEFINED → TRANSFER_DST**: Before we can copy pixels into the image. No previous access to wait for (`srcAccessMask = 0`), and transfer writes must wait (`dstAccessMask = TRANSFER_WRITE_BIT`). `TOP_OF_PIPE` means "don't wait for anything" and `TRANSFER` means "the transfer stage must wait."
+2. **TRANSFER_DST → SHADER_READ_ONLY**: After the copy, before the fragment shader reads it. Transfer writes must finish before shader reads can begin:
+
+```cpp
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
@@ -855,7 +895,11 @@ void VKRenderer::transitionImageLayout(VkImage image, VkFormat format,
 
     endSingleTimeCommands(commandBuffer);
 }
+```
 
+`copyBufferToImage` copies pixel data from a staging buffer into a `VkImage`. The `VkBufferImageCopy` region describes the copy — `bufferRowLength` and `bufferImageHeight` of 0 means the pixels are tightly packed (no padding between rows). The image must be in `TRANSFER_DST_OPTIMAL` layout when this command executes:
+
+```cpp
 void VKRenderer::copyBufferToImage(VkBuffer buffer, VkImage image,
     uint32_t width, uint32_t height)
 {
@@ -877,7 +921,11 @@ void VKRenderer::copyBufferToImage(VkBuffer buffer, VkImage image,
 
     endSingleTimeCommands(commandBuffer);
 }
+```
 
+Now `createTextureImage` orchestrates the full process. First we load the pixel data using `stb_image`. `STBI_rgb_alpha` forces 4-channel output even if the image file has fewer channels, giving us a consistent `R8G8B8A8` format:
+
+```cpp
 void VKRenderer::createTextureImage() {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load("resources/images/texture.png",
@@ -888,8 +936,11 @@ void VKRenderer::createTextureImage() {
     }
 
     VkDeviceSize imageSize = texWidth * texHeight * 4;
+```
 
-    // Staging buffer
+The staging buffer pattern is the same as with vertex buffers — load the pixel data into host-visible memory, then we'll copy it to the GPU:
+
+```cpp
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
     VmaAllocationInfo stagingAllocInfo;
@@ -908,8 +959,11 @@ void VKRenderer::createTextureImage() {
                     &stagingBuffer, &stagingAllocation, &stagingAllocInfo);
     memcpy(stagingAllocInfo.pMappedData, pixels, imageSize);
     stbi_image_free(pixels);
+```
 
-    // Create VkImage
+The `VkImageCreateInfo` describes the texture's properties. Key fields: `tiling = OPTIMAL` means the driver arranges texels in the most efficient layout for GPU access (as opposed to `LINEAR` which is row-major like CPU memory). `usage` combines `TRANSFER_DST_BIT` (we'll copy into it) and `SAMPLED_BIT` (shaders will sample from it). `format = R8G8B8A8_SRGB` matches what `stb_image` gave us:
+
+```cpp
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -931,8 +985,11 @@ void VKRenderer::createTextureImage() {
 
     vmaCreateImage(vmaAllocator, &imageInfo, &imageAllocInfo,
                    &textureImage, &textureImageAllocation, nullptr);
+```
 
-    // Transition, copy, transition
+Finally, the three-step transfer sequence: transition the image to accept transfers, copy the pixel data from the staging buffer, then transition the image to a shader-readable layout. This is the core pattern for uploading any image data to the GPU:
+
+```cpp
     transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     copyBufferToImage(stagingBuffer, textureImage, texWidth, texHeight);
@@ -971,6 +1028,8 @@ void createTextureImageView();
 void createTextureSampler();
 ```
 
+The image view is similar to the swapchain image views from Part 1 — it tells Vulkan how to interpret the image data:
+
 ```cpp
 void VKRenderer::createTextureImageView() {
     VkImageViewCreateInfo viewInfo{};
@@ -988,7 +1047,15 @@ void VKRenderer::createTextureImageView() {
         throw std::runtime_error("Failed to create texture image view");
     }
 }
+```
 
+The sampler controls how the GPU reads texels from the texture. `magFilter` and `minFilter` control interpolation when the texture is magnified or minified — `LINEAR` blends neighboring texels for smooth results, while `NEAREST` would give pixel-art-style hard edges.
+
+`addressMode` controls what happens when texture coordinates go outside [0, 1]: `REPEAT` tiles the texture, `CLAMP_TO_EDGE` stretches the edge color, `MIRRORED_REPEAT` mirrors at the boundary.
+
+`anisotropyEnable` and `maxAnisotropy` enable anisotropic filtering, which dramatically improves texture quality viewed at oblique angles (like floors or roads receding into the distance). We query the device's maximum supported level. Note: you must enable `samplerAnisotropy` in the device features struct when creating the logical device:
+
+```cpp
 void VKRenderer::createTextureSampler() {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physicalDevice, &properties);
@@ -1013,14 +1080,6 @@ void VKRenderer::createTextureSampler() {
 }
 ```
 
-### Key Concepts
-
-**Filtering**: `LINEAR` interpolates between texels for smooth results. `NEAREST` gives pixelated results (good for pixel art).
-
-**Address modes**: `REPEAT` tiles the texture, `CLAMP_TO_EDGE` stretches the edge color, `MIRRORED_REPEAT` mirrors.
-
-**Anisotropic filtering**: Improves texture quality at oblique viewing angles. Enable `samplerAnisotropy` in device features if using this.
-
 ---
 
 ## 10. Combined Image Sampler
@@ -1029,7 +1088,7 @@ To use the texture in a shader, you bind it through a descriptor set.
 
 ### Update Descriptor Set Layout
 
-Add a second binding for the combined image sampler:
+Add a second binding for the combined image sampler. `COMBINED_IMAGE_SAMPLER` means the image view and sampler are bound together as a single unit — this matches the `sampler2D` type in GLSL. Binding 0 is our uniform buffer (accessed by the vertex shader), and binding 1 is the texture (accessed by the fragment shader):
 
 ```cpp
 void VKRenderer::createDescriptorSetLayout() {
@@ -1062,7 +1121,7 @@ void VKRenderer::createDescriptorSetLayout() {
 
 ### Update Descriptor Pool and Sets
 
-The pool needs to also allocate combined image sampler descriptors:
+The pool must have enough descriptors for every type we use. Since we added a combined image sampler binding, we need to add a second pool size entry. The pool sizes must match or exceed what our descriptor set layouts require:
 
 ```cpp
 std::array<VkDescriptorPoolSize, 2> poolSizes{};
@@ -1075,7 +1134,7 @@ poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 poolInfo.pPoolSizes = poolSizes.data();
 ```
 
-In `createDescriptorSets()`, add an image write alongside the buffer write:
+In `createDescriptorSets()`, we now write two descriptors per set. The `VkDescriptorImageInfo` packages the image view, sampler, and current layout together — this is what the `sampler2D` in the shader will actually reference. Each write targets a specific `dstBinding` in the descriptor set:
 
 ```cpp
 VkDescriptorImageInfo imageInfo{};
@@ -1104,6 +1163,8 @@ vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()),
 ```
 
 ### Updated Fragment Shader (for textured rendering)
+
+The `sampler2D` at `binding = 1` corresponds to the combined image sampler we just set up. The `texture()` function samples the image at the given UV coordinates, applying the filtering and address mode settings from the sampler:
 
 ```glsl
 #version 450

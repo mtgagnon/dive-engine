@@ -54,6 +54,8 @@ void drawMesh(VkBuffer vertexBuf, VkBuffer indexBuf, uint32_t indexCount,
               const glm::mat4& modelMatrix);
 ```
 
+`drawMesh` is called between `beginFrame()` and `endFrame()` — it records draw commands into the current frame's command buffer. Each call binds a mesh's vertex and index buffers, computes the final MVP matrix by combining the per-frame view/projection with the per-object model matrix, pushes it as a push constant, and issues an indexed draw. This is the Vulkan equivalent of `SDL_RenderCopy` — one call per visible object:
+
 ```cpp
 // VKRenderer.cpp
 void VKRenderer::drawMesh(VkBuffer vertexBuf, VkBuffer indexBuf,
@@ -81,6 +83,8 @@ void VKRenderer::drawMesh(VkBuffer vertexBuf, VkBuffer indexBuf,
 
 Your `Engine` class currently creates and uses `SDLRenderer`. To support both renderers:
 
+The `useVulkan` flag controls which renderer to use. Since `VKRenderer` requires `SDL_WINDOW_VULKAN` at window creation time, this decision must happen before the window is created:
+
 ```cpp
 // Engine.h
 #include "SDLRenderer.h"
@@ -92,6 +96,8 @@ class Engine {
     VKRenderer vkRenderer;
 };
 ```
+
+The game loop maps cleanly between the two renderers. `beginFrame()` replaces `clearFrame()`, draw calls go between begin/end, and `endFrame()` replaces `renderFrame()` + `showFrame()`. The actor update happens in both paths since game logic is renderer-independent:
 
 ```cpp
 // Engine.cpp
@@ -137,7 +143,7 @@ You could also read a `rendering.config` setting to choose the renderer at start
 
 ## 3. Drawing Multiple Objects
 
-In `SDLRenderer`, each actor calls `DrawImg` individually. In Vulkan, you record all draw commands into a single command buffer:
+In `SDLRenderer`, each actor calls `DrawImg` individually during the render phase. In Vulkan, the pattern is conceptually identical — iterate all visible actors and issue a draw for each — but all commands are recorded into a single command buffer that gets submitted to the GPU at once. This batching is what gives Vulkan its performance advantage: the driver sees all draw calls at once and can optimize scheduling:
 
 ```cpp
 void Engine::render3D() {
@@ -331,7 +337,7 @@ During the render loop, iterate actors with `MeshRenderer` data and issue draw c
 
 ## 6. Exposing VKRenderer to Lua
 
-Your `ComponentDB` currently exposes `SDLRenderer` draw functions to Lua. The same pattern works for `VKRenderer`:
+Your `ComponentDB` currently exposes `SDLRenderer` draw functions to Lua via LuaBridge. The same namespace-based pattern works for `VKRenderer`. Rather than exposing raw Vulkan calls (which would be dangerous and complex), we expose high-level setters that modify actor properties. The engine's render loop then reads these properties and issues the appropriate Vulkan draw calls:
 
 ```cpp
 // In ComponentDB.cpp, when setting up Lua bindings:

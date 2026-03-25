@@ -239,7 +239,11 @@ Add to `VKRenderer.cpp`:
 ```cpp
 #include <vector>
 #include <cstring>
+```
 
+The first thing `createInstance` does is fill in a `VkApplicationInfo` struct. Most of these fields are informational metadata that drivers *may* use for optimization (e.g., well-known engines might get driver-specific fast paths), but `apiVersion` is the important one — it tells Vulkan which version of the API your app expects. We use `VK_API_VERSION_1_2` since it's widely supported and includes features we'll want later:
+
+```cpp
 void VKRenderer::createInstance() {
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -248,8 +252,11 @@ void VKRenderer::createInstance() {
     appInfo.pEngineName = "Dive Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_2;
+```
 
-    // Get extensions SDL needs for Vulkan surface
+Next we need to find out which Vulkan extensions are required. Vulkan is modular — the core API doesn't know about windows or surfaces. SDL knows which platform-specific surface extensions are needed (e.g., `VK_KHR_surface` plus `VK_KHR_xlib_surface` on Linux X11, or `VK_MVK_macos_surface` on macOS). We use the two-call enumerate pattern: first call with `nullptr` to get the count, then call again with a sized vector to get the names:
+
+```cpp
     unsigned int extensionCount = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
     std::vector<const char*> extensions(extensionCount);
@@ -259,7 +266,13 @@ void VKRenderer::createInstance() {
     extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     #endif
+```
 
+On macOS, Vulkan runs on top of Metal via MoltenVK, which is a "portability subset" — not full Vulkan. The two extra extensions tell the loader to enumerate MoltenVK as a valid device despite not being fully conformant.
+
+Now we assemble the `VkInstanceCreateInfo`. This is the pattern you'll see throughout Vulkan: a create-info struct that bundles everything the `vkCreate*` function needs. Every Vulkan struct starts with `sType` so the driver can identify and validate it:
+
+```cpp
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -276,6 +289,8 @@ void VKRenderer::createInstance() {
     }
 }
 ```
+
+The second parameter to `vkCreateInstance` is a custom memory allocator — passing `nullptr` uses the default. The function returns `VK_SUCCESS` or an error code; Vulkan never throws exceptions, so we check the result explicitly.
 
 Update `initialize()` and `cleanup()`:
 
@@ -345,6 +360,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 Add to `VKRenderer.cpp`:
 
+First, we use a preprocessor check to enable validation layers only in debug builds. `NDEBUG` is defined by CMake in Release mode. We also declare which layers to enable — `VK_LAYER_KHRONOS_validation` is the unified validation layer from the Vulkan SDK that catches virtually all API misuse:
+
 ```cpp
 #ifdef NDEBUG
     const bool enableValidationLayers = false;
@@ -355,8 +372,11 @@ Add to `VKRenderer.cpp`:
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
+```
 
-// Proxy functions — these extension functions aren't loaded automatically
+The debug messenger API (`vkCreateDebugUtilsMessengerEXT` / `vkDestroyDebugUtilsMessengerEXT`) is provided by an extension, not core Vulkan. Extension functions aren't loaded into the Vulkan dispatch table automatically — you have to look them up at runtime using `vkGetInstanceProcAddr`. These proxy functions handle that lookup and forward the call:
+
+```cpp
 VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,
     const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -382,7 +402,13 @@ void DestroyDebugUtilsMessengerEXT(
         func(instance, debugMessenger, pAllocator);
     }
 }
+```
 
+`vkGetInstanceProcAddr` takes the function name as a string and returns a function pointer (or `nullptr` if the extension isn't available). The `PFN_` prefix is Vulkan's naming convention for function pointer types.
+
+Next, the debug callback — this is the function Vulkan calls whenever a validation layer has something to report. The severity levels form a hierarchy: `VERBOSE` < `INFO` < `WARNING` < `ERROR`. We filter to warnings and above because verbose messages are extremely noisy. Returning `VK_FALSE` tells Vulkan to continue execution; returning `VK_TRUE` would abort the call that triggered the message:
+
+```cpp
 VKAPI_ATTR VkBool32 VKAPI_CALL VKRenderer::debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -394,7 +420,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VKRenderer::debugCallback(
     }
     return VK_FALSE;
 }
+```
 
+Before enabling validation layers, we check that the requested layers are actually installed on the system. This uses the familiar two-call enumerate pattern — first get the count, then fill the vector. We compare each requested layer name against the available layers:
+
+```cpp
 bool VKRenderer::checkValidationLayerSupport() {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -414,7 +444,16 @@ bool VKRenderer::checkValidationLayerSupport() {
     }
     return true;
 }
+```
 
+If this returns `false`, you likely need to install the Vulkan SDK validation layers. On Linux: `sudo apt install vulkan-validationlayers-dev`.
+
+`populateDebugMessengerCreateInfo` configures which messages we want to receive. We separate this into its own function because we'll reuse it in two places — once for the standalone debug messenger, and once embedded in the instance create info (explained below). The `messageSeverity` flags control which severity levels trigger the callback. The `messageType` flags control which categories of messages to report:
+- `GENERAL` — events unrelated to the spec or performance
+- `VALIDATION` — spec violations (the most useful category)
+- `PERFORMANCE` — non-optimal Vulkan usage
+
+```cpp
 void VKRenderer::populateDebugMessengerCreateInfo(
     VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 {
@@ -430,7 +469,11 @@ void VKRenderer::populateDebugMessengerCreateInfo(
         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = debugCallback;
 }
+```
 
+Finally, `setupDebugMessenger` creates the actual debug messenger object using the proxy function from earlier:
+
+```cpp
 void VKRenderer::setupDebugMessenger() {
     if (!enableValidationLayers) return;
 
@@ -443,7 +486,7 @@ void VKRenderer::setupDebugMessenger() {
 }
 ```
 
-Now update `createInstance()` to enable validation layers and the debug utils extension:
+Now update `createInstance()` to enable validation layers and the debug utils extension. The first change is a safety check — if validation was requested but the layers aren't installed, fail fast with a clear error:
 
 ```cpp
 void VKRenderer::createInstance() {
@@ -458,7 +501,11 @@ void VKRenderer::createInstance() {
     appInfo.pEngineName = "Dive Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_2;
+```
 
+When validation is enabled, we add the `VK_EXT_debug_utils` extension to our extension list. This is the extension that provides the debug messenger API:
+
+```cpp
     unsigned int sdlExtensionCount = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, nullptr);
     std::vector<const char*> extensions(sdlExtensionCount);
@@ -471,7 +518,11 @@ void VKRenderer::createInstance() {
     extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     #endif
+```
 
+The key new piece is the `pNext` chain. Every Vulkan create-info struct has a `pNext` field that can point to another struct, forming a linked list of configuration. By attaching a `VkDebugUtilsMessengerCreateInfoEXT` to the instance create info's `pNext`, the validation layer will also debug the `vkCreateInstance` and `vkDestroyInstance` calls themselves — which would otherwise happen before/after the debug messenger exists:
+
+```cpp
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -482,7 +533,6 @@ void VKRenderer::createInstance() {
     createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     #endif
 
-    // Enable validation layers and debug messenger for instance creation/destruction
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (enableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -518,17 +568,9 @@ void VKRenderer::cleanup() {
 }
 ```
 
-### Key Concepts
+### Summary
 
-**`VK_LAYER_KHRONOS_validation`**: The standard validation layer from the Vulkan SDK that catches most API misuse.
-
-**Debug messenger**: An object that receives validation layer messages via your callback. We filter to warnings and errors — verbose messages are usually too noisy.
-
-**Proxy functions**: `vkCreateDebugUtilsMessengerEXT` is an extension function, so it isn't loaded automatically. We use `vkGetInstanceProcAddr` to look it up at runtime.
-
-**`pNext` chain**: Attaching a `VkDebugUtilsMessengerCreateInfoEXT` to the instance create info's `pNext` field lets the validation layer debug the `vkCreateInstance` and `vkDestroyInstance` calls themselves.
-
-**Install validation layers**: On Linux: `sudo apt install vulkan-validationlayers-dev`
+We now have a full debug pipeline: validation layers intercept every Vulkan call and report misuse through our callback. The proxy functions handle loading the extension API, the `pNext` chain catches errors during instance creation/destruction, and the `#ifdef NDEBUG` guard ensures zero overhead in release builds.
 
 ---
 
@@ -569,6 +611,8 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
 Add to `VKRenderer.cpp`:
 
+`pickPhysicalDevice` uses the enumerate pattern to list all GPUs, then picks the first one that meets our requirements. `VkPhysicalDevice` is a read-only handle — you don't create or destroy it, you just pick one from the available set. After selection, we print the GPU name so you can verify the right device was chosen (useful on systems with both integrated and discrete GPUs):
+
 ```cpp
 void VKRenderer::pickPhysicalDevice() {
     uint32_t deviceCount = 0;
@@ -596,7 +640,13 @@ void VKRenderer::pickPhysicalDevice() {
     vkGetPhysicalDeviceProperties(physicalDevice, &props);
     std::cout << "Selected GPU: " << props.deviceName << std::endl;
 }
+```
 
+`findQueueFamilies` is more nuanced. A GPU exposes its capabilities through *queue families* — groups of queues that support certain operations. We need at least one family that supports graphics commands (`VK_QUEUE_GRAPHICS_BIT`) and one that can present to our window surface. Often these are the same family, but on some hardware they differ.
+
+We use `std::optional<uint32_t>` because queue family index 0 is valid, so we can't use 0 or -1 as a "not found" sentinel. `std::optional` cleanly distinguishes "no value" from "value is 0":
+
+```cpp
 VKRenderer::QueueFamilyIndices VKRenderer::findQueueFamilies(VkPhysicalDevice dev) {
     QueueFamilyIndices indices;
 
@@ -623,7 +673,13 @@ VKRenderer::QueueFamilyIndices VKRenderer::findQueueFamilies(VkPhysicalDevice de
 
     return indices;
 }
+```
 
+Note that `vkGetPhysicalDeviceSurfaceSupportKHR` checks whether a specific queue family can present to a specific surface — this is a property of the queue-family-and-surface *pair*, not just the queue family alone.
+
+`isDeviceSuitable` is deliberately minimal for now — it only checks that the required queue families exist. We'll add swapchain support checks in Section 9:
+
+```cpp
 bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
     QueueFamilyIndices indices = findQueueFamilies(dev);
     return indices.isComplete();
@@ -669,7 +725,11 @@ Add to `VKRenderer.cpp`:
 
 ```cpp
 #include <set>
+```
 
+Creating a logical device starts by specifying which queues we want. We use a `std::set` to collect unique queue family indices — if the graphics and present families happen to be the same (very common), the set deduplicates them so we only create one `VkDeviceQueueCreateInfo`. Each queue gets a priority from 0.0 to 1.0 that influences scheduling when multiple queues compete for GPU time. With a single queue per family, priority doesn't matter, but Vulkan requires it:
+
+```cpp
 void VKRenderer::createLogicalDevice() {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
@@ -688,7 +748,13 @@ void VKRenderer::createLogicalDevice() {
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
+```
 
+Next we declare which device features and extensions we need. `VkPhysicalDeviceFeatures` is a struct full of `VkBool32` fields for optional GPU capabilities (geometry shaders, tessellation, wide lines, etc.). We leave it zero-initialized for now — we'll enable `samplerAnisotropy` in Part 2 when we add textures.
+
+`VK_KHR_swapchain` is the most important device extension — without it, you can't present rendered images to the screen. It's technically optional because Vulkan can also be used for off-screen rendering or compute-only workloads:
+
+```cpp
     VkPhysicalDeviceFeatures deviceFeatures{};
 
     std::vector<const char*> deviceExtensions = {
@@ -697,7 +763,11 @@ void VKRenderer::createLogicalDevice() {
         "VK_KHR_portability_subset",
         #endif
     };
+```
 
+Now we assemble the device create info and create the logical device. Note that device-level validation layers are deprecated in modern Vulkan (validation is per-instance now), but we still set them for compatibility with older implementations:
+
+```cpp
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -716,7 +786,11 @@ void VKRenderer::createLogicalDevice() {
     if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device");
     }
+```
 
+Queues are created implicitly when you create the device — you don't call a separate `vkCreateQueue`. Instead, you retrieve handles to the queues that were created according to your `VkDeviceQueueCreateInfo` structs. The third parameter (0) is the queue index within that family — since we only requested 1 queue per family, it's always 0:
+
+```cpp
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
@@ -842,7 +916,11 @@ Add to `VKRenderer.cpp`:
 ```cpp
 #include <algorithm>
 #include <limits>
+```
 
+Creating a swapchain requires querying three things from the physical device: surface capabilities (min/max image count, min/max extent, supported transforms), supported surface formats (pixel format + color space), and supported present modes. `querySwapchainSupport` gathers all three using the enumerate pattern:
+
+```cpp
 VKRenderer::SwapchainSupportDetails VKRenderer::querySwapchainSupport(VkPhysicalDevice dev) {
     SwapchainSupportDetails details;
 
@@ -864,7 +942,11 @@ VKRenderer::SwapchainSupportDetails VKRenderer::querySwapchainSupport(VkPhysical
 
     return details;
 }
+```
 
+`chooseSwapSurfaceFormat` picks the pixel format and color space for swapchain images. `VK_FORMAT_B8G8R8A8_SRGB` means 8 bits per channel in BGRA order with SRGB gamma encoding — this gives gamma-correct rendering where colors look the same across different monitors. `VK_COLOR_SPACE_SRGB_NONLINEAR_KHR` is the standard sRGB color space. If our preferred combo isn't available, we fall back to whatever the driver offers first:
+
+```cpp
 VkSurfaceFormatKHR VKRenderer::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) {
     for (const auto& format : formats) {
         if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -874,7 +956,19 @@ VkSurfaceFormatKHR VKRenderer::chooseSwapSurfaceFormat(const std::vector<VkSurfa
     }
     return formats[0];
 }
+```
 
+`chooseSwapPresentMode` selects how images are presented to the screen. The available modes have different latency and tearing characteristics:
+
+| Mode | Description |
+|------|-------------|
+| `FIFO` | VSync — guaranteed available on all hardware, no tearing, but adds latency |
+| `MAILBOX` | Triple buffer — GPU keeps rendering, only the newest image gets displayed. Low latency, no tearing |
+| `IMMEDIATE` | No waiting at all — lowest latency but may tear |
+
+We prefer `MAILBOX` for its low-latency-without-tearing property. `FIFO` is the safe fallback since the Vulkan spec guarantees it's always supported:
+
+```cpp
 VkPresentModeKHR VKRenderer::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes) {
     for (const auto& mode : modes) {
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -883,7 +977,11 @@ VkPresentModeKHR VKRenderer::chooseSwapPresentMode(const std::vector<VkPresentMo
     }
     return VK_PRESENT_MODE_FIFO_KHR;
 }
+```
 
+`chooseSwapExtent` determines the resolution of the swapchain images. Most window managers set `currentExtent` to the window size in pixels, and we simply use that. But some (notably Wayland) set it to `uint32_max` to signal "you decide." In that case we query the actual drawable size from SDL and clamp it to the GPU's supported range:
+
+```cpp
 VkExtent2D VKRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
@@ -906,7 +1004,11 @@ VkExtent2D VKRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabili
 
     return actualExtent;
 }
+```
 
+Now `createSwapchain` ties everything together. First we query support and pick our preferences. We request `minImageCount + 1` images — one more than the minimum gives us an extra buffer to work with while waiting for the driver, enabling smoother pipelining:
+
+```cpp
 void VKRenderer::createSwapchain() {
     SwapchainSupportDetails support = querySwapchainSupport(physicalDevice);
 
@@ -918,7 +1020,11 @@ void VKRenderer::createSwapchain() {
     if (support.capabilities.maxImageCount > 0 && imageCount > support.capabilities.maxImageCount) {
         imageCount = support.capabilities.maxImageCount;
     }
+```
 
+The create info has several fields worth understanding. `imageArrayLayers` is 1 for normal rendering (2 for stereoscopic 3D). `imageUsage` tells Vulkan how we'll use these images — `COLOR_ATTACHMENT_BIT` means we render directly to them. If we wanted post-processing, we'd add `TRANSFER_DST_BIT` to blit into them instead:
+
+```cpp
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = surface;
@@ -928,7 +1034,11 @@ void VKRenderer::createSwapchain() {
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+```
 
+If the graphics and present queue families are different, images must be shared between them. `CONCURRENT` mode lets multiple families access the image without explicit ownership transfers (simpler but slightly slower). `EXCLUSIVE` mode gives one family exclusive access (faster, since it's the common case where both queues are the same family):
+
+```cpp
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
     uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
@@ -939,7 +1049,11 @@ void VKRenderer::createSwapchain() {
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
+```
 
+`preTransform` applies a rotation/mirror to the image before presentation — we use `currentTransform` to apply no extra transform. `compositeAlpha` controls alpha blending with other windows — `OPAQUE` means our window is fully opaque. `clipped = VK_TRUE` lets the driver discard pixels obscured by other windows (a free optimization). `oldSwapchain` is used during swapchain recreation (Part 3) to hand off the old one:
+
+```cpp
     createInfo.preTransform = support.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
@@ -949,7 +1063,11 @@ void VKRenderer::createSwapchain() {
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create swap chain");
     }
+```
 
+Finally, we retrieve handles to the swapchain images. The driver creates them — we just get `VkImage` handles. We also save the format and extent since we'll need them later for image views, framebuffers, and the render pass:
+
+```cpp
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
     swapchainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data());
@@ -959,7 +1077,7 @@ void VKRenderer::createSwapchain() {
 }
 ```
 
-Also update `isDeviceSuitable` to verify swap chain support:
+Also update `isDeviceSuitable` to verify the device supports at least one format and one present mode — a device with an empty format or present mode list can't create a swapchain:
 
 ```cpp
 bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
@@ -972,23 +1090,6 @@ bool VKRenderer::isDeviceSuitable(VkPhysicalDevice dev) {
     return indices.isComplete() && swapchainAdequate;
 }
 ```
-
-### Key Concepts
-
-**Surface format**: `VK_FORMAT_B8G8R8A8_SRGB` is 8 bits per channel in SRGB color space — gamma-correct rendering.
-
-**Present modes**:
-
-| Mode | Description |
-|------|-------------|
-| `IMMEDIATE` | No wait, may tear |
-| `FIFO` | VSync — guaranteed available |
-| `FIFO_RELAXED` | VSync, but may tear if late |
-| `MAILBOX` | Triple buffer — low latency, no tearing |
-
-**Extent**: The swap chain image resolution, usually matching the window size.
-
-**Image sharing mode**: If graphics and present queues are different families, images need `CONCURRENT` sharing.
 
 ---
 
@@ -1008,6 +1109,10 @@ void createImageViews();
 
 Add to `VKRenderer.cpp`:
 
+We create one `VkImageView` per swapchain image. The `viewType` determines how the image data is interpreted — `2D` for regular textures, `CUBE` for cubemaps, `2D_ARRAY` for texture arrays.
+
+The `components` field lets you remap color channels (e.g., swapping R and B, or broadcasting one channel to all four). `SWIZZLE_IDENTITY` means "use the channel as-is" — the default you want for normal rendering:
+
 ```cpp
 void VKRenderer::createImageViews() {
     swapchainImageViews.resize(swapchainImages.size());
@@ -1023,7 +1128,11 @@ void VKRenderer::createImageViews() {
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+```
 
+The `subresourceRange` describes which part of the image the view covers. `aspectMask` selects color vs depth vs stencil data. `baseMipLevel` and `levelCount` select mip levels (we have no mipmaps yet, so just level 0). `baseArrayLayer` and `layerCount` select array layers (we're not using texture arrays, so just layer 0):
+
+```cpp
         createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         createInfo.subresourceRange.baseMipLevel = 0;
         createInfo.subresourceRange.levelCount = 1;
@@ -1036,12 +1145,6 @@ void VKRenderer::createImageViews() {
     }
 }
 ```
-
-### Key Concepts
-
-**View type**: `VK_IMAGE_VIEW_TYPE_2D` for normal textures, `_CUBE` for cubemaps, `_2D_ARRAY` for arrays.
-
-**Subresource range**: Specifies which parts of the image the view accesses — aspect (color/depth), mip levels, array layers.
 
 ---
 
@@ -1243,6 +1346,13 @@ viewportState.scissorCount = 1;
 
 ### Rasterizer
 
+The rasterizer converts the triangles defined by the vertex shader into fragments (pixel-sized pieces) that the fragment shader will color. Key fields:
+- `depthClampEnable` — if `VK_TRUE`, fragments beyond the near/far planes are clamped instead of discarded (useful for shadow maps, requires a GPU feature)
+- `rasterizerDiscardEnable` — if `VK_TRUE`, geometry never passes through rasterization, effectively disabling output (useful for transform feedback)
+- `polygonMode` — `FILL` fills triangles, `LINE` draws wireframe, `POINT` draws vertices only
+- `cullMode` — `BACK_BIT` discards back-facing triangles (a major performance optimization)
+- `frontFace` — defines which winding order is "front." We'll change this to `COUNTER_CLOCKWISE` in Part 3 when we add 3D models with GLM
+
 ```cpp
 VkPipelineRasterizationStateCreateInfo rasterizer{};
 rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -1257,6 +1367,8 @@ rasterizer.depthBiasEnable = VK_FALSE;
 
 ### Multisampling (disabled)
 
+Multisampling (MSAA) smooths jagged edges by sampling each pixel at multiple points. We disable it for now (`SAMPLE_COUNT_1_BIT` = no multisampling). Part 4 discusses how to enable it later:
+
 ```cpp
 VkPipelineMultisampleStateCreateInfo multisampling{};
 multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1266,13 +1378,21 @@ multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
 ### Color Blending
 
+Color blending controls how the fragment shader's output combines with the existing framebuffer contents. There are two levels of configuration: per-attachment (one per color attachment in the render pass) and global.
+
+The per-attachment struct controls whether blending is enabled and which channels to write. With `blendEnable = VK_FALSE`, the fragment color replaces the framebuffer value. The `colorWriteMask` controls which channels are actually written — we want all four (RGBA):
+
 ```cpp
 VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 colorBlendAttachment.colorWriteMask =
     VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 colorBlendAttachment.blendEnable = VK_FALSE;
+```
 
+The global struct aggregates all per-attachment states. `logicOpEnable` would replace blending with bitwise logic operations (rarely used in normal rendering):
+
+```cpp
 VkPipelineColorBlendStateCreateInfo colorBlending{};
 colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 colorBlending.logicOpEnable = VK_FALSE;
@@ -1309,6 +1429,10 @@ void createRenderPass();
 
 Add to `VKRenderer.cpp`:
 
+First we describe the color attachment — the swapchain image we'll render into. `loadOp` controls what happens to the attachment at the start of the render pass: `CLEAR` fills it with a color (we'll specify the clear color when recording commands). `storeOp = STORE` means we keep the rendered contents (as opposed to `DONT_CARE` which discards them — useful for depth buffers).
+
+The `initialLayout` is the layout the image is in when the render pass begins. `UNDEFINED` means we don't care about previous contents (the clear will overwrite everything anyway). `finalLayout` is what the driver transitions the image to after the render pass — `PRESENT_SRC_KHR` makes it ready for presentation to the screen:
+
 ```cpp
 void VKRenderer::createRenderPass() {
     VkAttachmentDescription colorAttachment{};
@@ -1320,7 +1444,11 @@ void VKRenderer::createRenderPass() {
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+```
 
+A subpass is a rendering operation within the render pass. Even though we only have one subpass, Vulkan requires you to define it explicitly. The attachment reference connects this subpass to attachment 0 (our color attachment) and specifies the optimal layout for writing color data. The `layout(location = 0) out vec4 outColor` in the fragment shader maps to `pColorAttachments[0]`:
+
+```cpp
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1329,7 +1457,11 @@ void VKRenderer::createRenderPass() {
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
+```
 
+Subpass dependencies define execution ordering between subpasses (or between a subpass and external commands). `VK_SUBPASS_EXTERNAL` refers to the implicit operations that happen before/after the render pass — in this case, the swapchain image layout transition. This dependency says: "don't start writing to the color attachment until the image is available from the swapchain." Without it, we might try to render into an image the presentation engine is still reading:
+
+```cpp
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -1394,6 +1526,8 @@ void createGraphicsPipeline();
 
 Add to `VKRenderer.cpp`:
 
+The first step is loading the compiled SPIR-V bytecode and creating shader modules from it. Each shader stage gets a `VkPipelineShaderStageCreateInfo` that specifies the shader module and the entry point function name. `pName = "main"` refers to the `void main()` in our GLSL code — Vulkan supports multiple entry points per module, so you must specify which one to use:
+
 ```cpp
 void VKRenderer::createGraphicsPipeline() {
     auto vertShaderCode = readFile("resources/shaders/hardcoded_triangle.vert.spv");
@@ -1415,8 +1549,11 @@ void VKRenderer::createGraphicsPipeline() {
     fragShaderStageInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+```
 
-    // Vertex input — empty, vertices are hardcoded in the shader
+Now we set up all the fixed-function state structs that were previewed in Section 13. Vertex input is empty because our vertices are hardcoded in the shader. `TRIANGLE_LIST` means every 3 vertices form an independent triangle:
+
+```cpp
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 0;
@@ -1426,7 +1563,11 @@ void VKRenderer::createGraphicsPipeline() {
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
+```
 
+We mark viewport and scissor as dynamic state so we can set them per-frame in the command buffer rather than baking them into the pipeline. This means window resizes won't require pipeline recreation — a significant convenience:
+
+```cpp
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
@@ -1441,7 +1582,11 @@ void VKRenderer::createGraphicsPipeline() {
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
+```
 
+Rasterizer, multisampling, and color blending — the same configuration from Section 13:
+
+```cpp
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
@@ -1468,7 +1613,11 @@ void VKRenderer::createGraphicsPipeline() {
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
+```
 
+The pipeline layout defines the interface between shaders and the data they access — descriptor set layouts (for uniform buffers and textures) and push constant ranges (for small per-draw data). We leave it empty for now and add push constants in Part 2:
+
+```cpp
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 0;
@@ -1477,7 +1626,13 @@ void VKRenderer::createGraphicsPipeline() {
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout");
     }
+```
 
+Finally, the `VkGraphicsPipelineCreateInfo` brings everything together — shader stages, all fixed-function state, layout, and render pass. The `subpass = 0` specifies which subpass in the render pass this pipeline will be used with. The second parameter to `vkCreateGraphicsPipelines` is an optional pipeline cache that speeds up pipeline creation across runs (we pass `VK_NULL_HANDLE` for now).
+
+After creating the pipeline, we destroy the shader modules — the pipeline has its own copy of the compiled shader code, so the modules are no longer needed:
+
+```cpp
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -1574,6 +1729,8 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 Add to `VKRenderer.cpp`:
 
+A command pool is a memory manager for command buffers. It's tied to a specific queue family — all command buffers allocated from this pool will be submitted to the graphics queue. The `RESET_COMMAND_BUFFER_BIT` flag allows us to re-record individual command buffers each frame (without it, you'd have to reset the entire pool at once):
+
 ```cpp
 void VKRenderer::createCommandPool() {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
@@ -1587,7 +1744,11 @@ void VKRenderer::createCommandPool() {
         throw std::runtime_error("Failed to create command pool");
     }
 }
+```
 
+We allocate one command buffer per frame in flight. `PRIMARY` level means these buffers are submitted directly to a queue. `SECONDARY` buffers can be called from within a primary buffer — useful for multi-threaded recording where different threads record different secondary buffers and a primary buffer assembles them:
+
+```cpp
 void VKRenderer::createCommandBuffers() {
     commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1601,7 +1762,11 @@ void VKRenderer::createCommandBuffers() {
         throw std::runtime_error("Failed to allocate command buffers");
     }
 }
+```
 
+`recordCommandBuffer` is where the actual rendering commands go. First we begin the command buffer, then begin the render pass. The render pass needs to know which framebuffer to target (selected by `imageIndex` — the swapchain image we acquired) and the clear color to use (dark blueish gray). `VK_SUBPASS_CONTENTS_INLINE` means we'll record commands directly into this primary buffer rather than calling secondary buffers:
+
+```cpp
 void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1622,7 +1787,11 @@ void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+```
 
+After beginning the render pass, we bind our graphics pipeline, then set the viewport and scissor dynamically (since we declared them as dynamic state in the pipeline). The viewport maps normalized device coordinates to pixel coordinates. The scissor defines which region of the framebuffer can be written to — pixels outside the scissor are discarded:
+
+```cpp
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
     VkViewport viewport{};
@@ -1638,7 +1807,11 @@ void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
     scissor.offset = {0, 0};
     scissor.extent = swapchainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+```
 
+Finally, the draw call and cleanup. `vkCmdDraw(commandBuffer, 3, 1, 0, 0)` means: draw 3 vertices, 1 instance, starting from vertex index 0 and instance index 0. Since our vertices are hardcoded in the shader, the vertex count is all Vulkan needs to know. After drawing, we end the render pass and finalize the command buffer:
+
+```cpp
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
@@ -1648,14 +1821,6 @@ void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
     }
 }
 ```
-
-### Key Concepts
-
-**`RESET_COMMAND_BUFFER_BIT`**: Allows individual command buffers to be reset and re-recorded each frame.
-
-**Primary vs Secondary**: Primary buffers are submitted directly to queues. Secondary buffers are called from primary buffers (useful for multi-threaded recording).
-
-**`vkCmdDraw(commandBuffer, 3, 1, 0, 0)`**: Draw 3 vertices, 1 instance, starting from vertex 0.
 
 ### Compare to SDLRenderer
 
@@ -1710,6 +1875,10 @@ void createSyncObjects();
 
 Add to `VKRenderer.cpp`:
 
+We create one set of sync objects per frame in flight. Each set has: an `imageAvailable` semaphore (GPU signals when swapchain image is ready), a `renderFinished` semaphore (GPU signals when rendering is done), and a fence (CPU waits on it to know the frame slot is free).
+
+`VK_FENCE_CREATE_SIGNALED_BIT` is critical — fences normally start unsignaled, meaning `vkWaitForFences` would block forever on the first frame since no previous GPU work exists to signal it. By starting signaled, the first frame's wait returns immediately:
+
 ```cpp
 void VKRenderer::createSyncObjects() {
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1733,7 +1902,7 @@ void VKRenderer::createSyncObjects() {
 }
 ```
 
-Now implement `beginFrame()` and `endFrame()`:
+Now implement `beginFrame()`. The fence wait is the CPU-GPU synchronization point: it blocks until the GPU finishes using this frame slot's resources (command buffer, semaphores). Once the fence signals, we know the GPU is done and we can safely reset and reuse those resources. `vkAcquireNextImageKHR` asks the presentation engine for the next available swapchain image, and the `imageAvailable` semaphore will be signaled once the image is actually ready:
 
 ```cpp
 void VKRenderer::beginFrame() {
@@ -1746,7 +1915,14 @@ void VKRenderer::beginFrame() {
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
     recordCommandBuffer(commandBuffers[currentFrame], currentImageIndex);
 }
+```
 
+`endFrame()` submits the recorded command buffer and presents the result. The submit info orchestrates GPU-GPU synchronization:
+- `pWaitSemaphores` / `pWaitDstStageMask`: wait for `imageAvailable` before the color attachment output stage (don't write pixels until the image is ready)
+- `pSignalSemaphores`: signal `renderFinished` when rendering completes
+- The fence parameter signals `inFlightFences[currentFrame]` when the GPU finishes, so the next time this frame slot comes around, `beginFrame` can wait on it:
+
+```cpp
 void VKRenderer::endFrame() {
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1766,7 +1942,11 @@ void VKRenderer::endFrame() {
     if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer");
     }
+```
 
+Presentation waits on `renderFinished` to ensure the image is fully rendered before being displayed. `currentFrame` advances modulo `MAX_FRAMES_IN_FLIGHT`, rotating between frame slots so the CPU can prepare the next frame while the GPU works on the current one:
+
+```cpp
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
@@ -1782,16 +1962,6 @@ void VKRenderer::endFrame() {
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 ```
-
-### Key Concepts
-
-**`VK_FENCE_CREATE_SIGNALED_BIT`**: Fences start signaled so the first frame doesn't deadlock waiting for a previous frame that never existed.
-
-**Why 2 of everything**: With `MAX_FRAMES_IN_FLIGHT = 2`, the CPU can prepare frame N+1 while the GPU works on frame N.
-
-**Semaphores vs Fences**:
-- Semaphores: GPU-to-GPU sync. The CPU never waits on them.
-- Fences: GPU-to-CPU sync. The CPU calls `vkWaitForFences` to block.
 
 ### Compare to SDLRenderer
 

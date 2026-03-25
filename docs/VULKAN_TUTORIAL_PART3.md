@@ -61,6 +61,8 @@ VkFormat VKRenderer::findDepthFormat() {
 
 ### Creating Depth Resources
 
+The depth image is similar to a texture image, but it uses a depth format and is only used as an attachment (never sampled by shaders). The image must match the swapchain extent since there's one depth value per pixel. `DEPTH_STENCIL_ATTACHMENT_BIT` tells Vulkan this image will be used as a depth/stencil buffer in a render pass:
+
 ```cpp
 void VKRenderer::createDepthResources() {
     VkFormat depthFormat = findDepthFormat();
@@ -88,7 +90,11 @@ void VKRenderer::createDepthResources() {
                        &depthImage, &depthImageAllocation, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create depth image");
     }
+```
 
+The image view for the depth image uses `VK_IMAGE_ASPECT_DEPTH_BIT` instead of `COLOR_BIT`. If the format includes a stencil component (like `D24_UNORM_S8_UINT`), you'd need a separate view with `STENCIL_BIT` to access the stencil data — but we don't need stencil for basic depth testing:
+
+```cpp
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = depthImage;
@@ -108,7 +114,7 @@ void VKRenderer::createDepthResources() {
 
 ### Updating the Render Pass
 
-The render pass needs a second attachment for depth:
+The render pass needs a second attachment for depth. The depth attachment's `storeOp = DONT_CARE` means we don't need the depth data after the render pass completes — the driver can discard it for better performance. Its `finalLayout` stays as `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` since we're not presenting or sampling from the depth buffer:
 
 ```cpp
 void VKRenderer::createRenderPass() {
@@ -131,7 +137,11 @@ void VKRenderer::createRenderPass() {
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+```
 
+The subpass now references both attachments. `pDepthStencilAttachment` is singular (not an array) because a subpass can have at most one depth/stencil attachment. The reference points to attachment index 1 (matching the order in the attachments array):
+
+```cpp
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -145,7 +155,11 @@ void VKRenderer::createRenderPass() {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
+```
 
+The dependency now includes `EARLY_FRAGMENT_TESTS_BIT` in both stage masks and `DEPTH_STENCIL_ATTACHMENT_WRITE_BIT` in the destination access mask. This ensures the depth image layout transition completes before the early fragment tests try to read/write depth values:
+
+```cpp
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
@@ -261,7 +275,7 @@ Download `tiny_obj_loader.h` and place it in your include path. In one `.cpp` fi
 
 ### Upgrading the Vertex Struct for 3D
 
-The vertex struct needs 3D positions and texture coordinates:
+The vertex struct upgrades from `vec2` to `vec3` for positions and adds a `texCoord` field. The binding description stays the same (one binding at stride `sizeof(Vertex)`), but we now have 3 attribute descriptions. Each attribute's `location` matches the `layout(location = N)` in the vertex shader, and the `format` tells Vulkan how to interpret the raw bytes — `R32G32B32_SFLOAT` for a 3-component float vector, `R32G32_SFLOAT` for a 2-component one:
 
 ```cpp
 struct Vertex {
@@ -304,7 +318,7 @@ struct Vertex {
 };
 ```
 
-For vertex deduplication with `std::unordered_map`, add a hash specialization:
+For vertex deduplication with `std::unordered_map`, we need a hash specialization. GLM provides hash functions for its vector types in the experimental `gtx/hash.hpp` header. The hash combines all three fields using XOR and bit shifts — a standard technique for combining hashes:
 
 ```cpp
 #define GLM_ENABLE_EXPERIMENTAL
@@ -332,6 +346,8 @@ std::vector<uint32_t> indices;
 void loadModel();
 ```
 
+`tinyobj::LoadObj` parses the OBJ file into three structures: `attrib` contains the raw vertex data (positions, normals, texture coordinates as flat arrays), `shapes` contains the mesh topology (which vertices form each face), and `materials` contains material definitions (unused here). The function returns `false` on failure and populates `err` with details:
+
 ```cpp
 #include <unordered_map>
 
@@ -344,7 +360,13 @@ void VKRenderer::loadModel() {
     if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "resources/models/model.obj")) {
         throw std::runtime_error("Failed to load model: " + err);
     }
+```
 
+OBJ files store positions, normals, and texture coordinates in separate arrays, with faces referencing them by index. A single face vertex might use position #5, texcoord #12, and normal #3 — different combinations create unique vertices.
+
+We use an `unordered_map` to deduplicate: if a vertex with the same position, color, and texcoord was already seen, we reuse its index. The Y-flip on texture coordinates (`1.0f - y`) converts from OBJ's bottom-left origin to Vulkan's top-left origin. This deduplication can dramatically reduce vertex count (e.g., the viking room model goes from ~1.5M face-vertices to ~265K unique vertices):
+
+```cpp
     std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
     for (const auto& shape : shapes) {
@@ -414,6 +436,8 @@ void recreateSwapchain();
 void cleanupSwapchain();
 ```
 
+`cleanupSwapchain` destroys everything that depends on the swapchain's size or images: the depth resources (sized to match the swapchain), framebuffers (reference swapchain image views), image views (wrap swapchain images), and the swapchain itself. Note the order — dependents are destroyed before the things they depend on:
+
 ```cpp
 void VKRenderer::cleanupSwapchain() {
     vkDestroyImageView(device, depthImageView, nullptr);
@@ -429,7 +453,13 @@ void VKRenderer::cleanupSwapchain() {
 
     vkDestroySwapchainKHR(device, swapchain, nullptr);
 }
+```
 
+`recreateSwapchain` handles the full rebuild. The `while` loop handles minimized windows — when minimized, `SDL_Vulkan_GetDrawableSize` returns 0x0, and we can't create a swapchain with zero extent. We wait for SDL events (which include the restore event) until the window has a valid size again.
+
+`vkDeviceWaitIdle` blocks until the GPU finishes all outstanding work — we can't destroy resources the GPU might still be using. Then we tear down the old swapchain-dependent objects and recreate them:
+
+```cpp
 void VKRenderer::recreateSwapchain() {
     int width = 0, height = 0;
     SDL_Vulkan_GetDrawableSize(window, &width, &height);
@@ -451,7 +481,9 @@ void VKRenderer::recreateSwapchain() {
 
 ### Triggering Recreation
 
-Update `beginFrame()` and `endFrame()` to handle `VK_ERROR_OUT_OF_DATE_KHR`:
+Update `beginFrame()` and `endFrame()` to handle `VK_ERROR_OUT_OF_DATE_KHR`. This error means the swapchain is no longer compatible with the surface — typically because the window was resized. When `vkAcquireNextImageKHR` returns this error, the swapchain can't provide images, so we must recreate it immediately and bail out of the current frame.
+
+Note the fence reset is moved *after* the acquire check — if we reset the fence and then return early for recreation, we'd lose track of that fence's state:
 
 ```cpp
 void VKRenderer::beginFrame() {
@@ -469,7 +501,11 @@ void VKRenderer::beginFrame() {
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
     recordCommandBuffer(commandBuffers[currentFrame], currentImageIndex);
 }
+```
 
+In `endFrame()`, we check after presentation. `VK_SUBOPTIMAL_KHR` means the swapchain still works but no longer matches the surface properties optimally (e.g., the window was resized but the old swapchain images still display). We treat both `OUT_OF_DATE` and `SUBOPTIMAL` as triggers for recreation:
+
+```cpp
 void VKRenderer::endFrame() {
     // ... submit and present as before ...
 

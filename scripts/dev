@@ -5,29 +5,39 @@
 #   dev build -m    configure + compile + run (Mac/Xcode)
 #   dev run   -l    compile + run, skip configure (Linux debug)
 #   dev run   -m    compile + run, skip configure (Mac/Xcode)
+#   dev lint        run clang-tidy on all project source files
 
 _build() {
   case "$1" in
-    -l) eval "$BUILD_LINUX_D" && cmake --build $PROJECT_DIR/builds/build-debug && eval "$LINK_COMPILE_COMMANDS" && $PROJECT_DIR/builds/build-debug/dive_engine ;;
-    -m) eval "$BUILD_MAC" && cmake --build $PROJECT_DIR/builds/build-xcode && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
+    -l) eval "$BUILD_LINUX_D" && cmake --build $PROJECT_DIR/builds/build-debug -- -s && eval "$LINK_COMPILE_COMMANDS" && $PROJECT_DIR/builds/build-debug/dive_engine ;;
+    -m) eval "$BUILD_MAC" && cmake --build $PROJECT_DIR/builds/build-xcode -- -s && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
     *)  echo "Usage: dev build -l | -m" ;;
   esac
 }
 
 _run() {
   case "$1" in
-    -l) cmake --build $PROJECT_DIR/builds/build-debug && $PROJECT_DIR/builds/build-debug/dive_engine ;;
-    -m) cmake --build $PROJECT_DIR/builds/build-xcode && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
+    -l) cmake --build $PROJECT_DIR/builds/build-debug -- -s && $PROJECT_DIR/builds/build-debug/dive_engine ;;
+    -m) cmake --build $PROJECT_DIR/builds/build-xcode -- -s && $PROJECT_DIR/builds/build-xcode/dive_engine ;;
     *)  echo "Usage: dev run -l | -m" ;;
   esac
+}
+
+_lint() {
+  local sources=($(find $PROJECT_DIR/src -name "*.cpp"))
+  for file in $sources; do
+    echo "Linting $file..."
+    clang-tidy "$file" -p $PROJECT_DIR/builds/build-debug
+  done
 }
 
 case "$1" in
   build) _build "$2" ;;
   run)   _run   "$2" ;;
+  lint)  _lint ;;
   *)
-    echo "Usage: dev <command> <platform>"
-    echo "  Commands:  build | run"
-    echo "  Platforms: -l (Linux) | -m (Mac)"
+    echo "Usage: dev <command> [platform]"
+    echo "  Commands:  build | run | lint"
+    echo "  Platforms: -l (Linux) | -m (Mac)  (required for build/run)"
     ;;
 esac
