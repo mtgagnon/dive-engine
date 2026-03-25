@@ -1,0 +1,42 @@
+name: Lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  clang-tidy:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang clang-tidy cmake
+
+      - name: Configure CMake
+        run: |
+          cmake \
+            -G 'Unix Makefiles' \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -S ${{ github.workspace }} \
+            -B ${{ github.workspace }}/builds/build-debug \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Run clang-tidy
+        run: |
+          set -e
+          failed=0
+          for file in ${{ github.workspace }}/src/*.cpp; do
+            echo "Linting $file..."
+            clang-tidy "$file" -p ${{ github.workspace }}/builds/build-debug --warnings-as-errors=* || failed=1
+          done
+          exit $failed
