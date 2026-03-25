@@ -5,6 +5,7 @@ This tutorial follows [vulkan-tutorial.com](https://vulkan-tutorial.com/), adapt
 ## Table of Contents
 
 **Introduction**
+
 1. [Vulkan vs SDL Renderer: Mental Model Shift](#1-vulkan-vs-sdl-renderer-mental-model-shift)
 2. [Vulkan Architecture Overview](#2-vulkan-architecture-overview)
 
@@ -79,6 +80,7 @@ vkQueuePresentKHR()          // Present to screen
 ### Why So Verbose?
 
 Vulkan gives you control over:
+
 - Memory allocation (where textures/buffers live)
 - Synchronization (when GPU/CPU wait for each other)
 - Pipeline state (shaders, blend modes, depth testing)
@@ -125,17 +127,19 @@ This verbosity enables better performance, predictable behavior, and cross-platf
 
 ### Object Relationships
 
-| Object | What It Is | Lifetime |
-|--------|------------|----------|
-| `VkInstance` | Connection to Vulkan | App lifetime |
-| `VkSurfaceKHR` | Window's drawable area | App lifetime |
-| `VkPhysicalDevice` | Your GPU (read-only handle) | App lifetime |
-| `VkDevice` | Logical GPU connection | App lifetime |
-| `VkQueue` | Command submission endpoint | Device lifetime |
-| `VkSwapchainKHR` | Image buffers for presenting | Can be recreated (resize) |
-| `VkRenderPass` | Describes render operation | Pipeline lifetime |
-| `VkPipeline` | Shader + state config | App lifetime (usually) |
-| `VkCommandBuffer` | Recorded GPU commands | Per-frame or reusable |
+
+| Object             | What It Is                   | Lifetime                  |
+| ------------------ | ---------------------------- | ------------------------- |
+| `VkInstance`       | Connection to Vulkan         | App lifetime              |
+| `VkSurfaceKHR`     | Window's drawable area       | App lifetime              |
+| `VkPhysicalDevice` | Your GPU (read-only handle)  | App lifetime              |
+| `VkDevice`         | Logical GPU connection       | App lifetime              |
+| `VkQueue`          | Command submission endpoint  | Device lifetime           |
+| `VkSwapchainKHR`   | Image buffers for presenting | Can be recreated (resize) |
+| `VkRenderPass`     | Describes render operation   | Pipeline lifetime         |
+| `VkPipeline`       | Shader + state config        | App lifetime (usually)    |
+| `VkCommandBuffer`  | Recorded GPU commands        | Per-frame or reusable     |
+
 
 ---
 
@@ -308,15 +312,16 @@ void VKRenderer::cleanup() {
 
 ### Key Concepts
 
-**`VkApplicationInfo`**: Metadata about your app. Optional but helps drivers optimize.
+`**VkApplicationInfo**`: Metadata about your app. Optional but helps drivers optimize.
 
 **Extensions**: Vulkan is modular. The base API is minimal; extensions add features:
+
 - `VK_KHR_surface` — window surfaces (SDL requests this automatically)
 - `VK_KHR_portability_enumeration` — needed for MoltenVK on macOS
 
-**`sType`**: Every Vulkan struct has a `sType` field. This enables the driver to validate and version structures.
+`**sType`**: Every Vulkan struct has a `sType` field. This enables the driver to validate and version structures.
 
-**`nullptr` allocator**: The last parameter to most `vkCreate*` functions is a custom allocator. We pass `nullptr` to use default allocation.
+`**nullptr` allocator**: The last parameter to most `vkCreate`* functions is a custom allocator. We pass `nullptr` to use default allocation.
 
 ---
 
@@ -449,6 +454,7 @@ bool VKRenderer::checkValidationLayerSupport() {
 If this returns `false`, you likely need to install the Vulkan SDK validation layers. On Linux: `sudo apt install vulkan-validationlayers-dev`.
 
 `populateDebugMessengerCreateInfo` configures which messages we want to receive. We separate this into its own function because we'll reuse it in two places — once for the standalone debug messenger, and once embedded in the instance create info (explained below). The `messageSeverity` flags control which severity levels trigger the callback. The `messageType` flags control which categories of messages to report:
+
 - `GENERAL` — events unrelated to the spec or performance
 - `VALIDATION` — spec violations (the most useful category)
 - `PERFORMANCE` — non-optimal Vulkan usage
@@ -581,6 +587,7 @@ A physical device represents your GPU. You query its capabilities and choose one
 ### Queue Families
 
 GPUs have different types of queues:
+
 - **Graphics queue**: Rendering commands
 - **Compute queue**: Compute shaders
 - **Transfer queue**: Memory copies
@@ -699,7 +706,7 @@ std::vector<Thing> things(count);
 vkEnumerateSomething(handle, &count, things.data()); // Fill array
 ```
 
-**`std::optional`**: Queue family indices are `uint32_t` where any value (including 0) is valid. `std::optional` lets us distinguish "not found" from "found at index 0."
+`**std::optional**`: Queue family indices are `uint32_t` where any value (including 0) is valid. `std::optional` lets us distinguish "not found" from "found at index 0."
 
 **Device suitability**: We check that the device has both a graphics queue and a present queue. We'll extend this check with swapchain support later.
 
@@ -804,7 +811,7 @@ Queues are created implicitly when you create the device — you don't call a se
 
 **Device features**: GPU capabilities like geometry shaders, multi-viewport, etc. We leave this empty for now.
 
-**`std::set` for unique families**: If the graphics and present queue families are the same (common), we only create one queue create info.
+`**std::set` for unique families**: If the graphics and present queue families are the same (common), we only create one queue create info.
 
 ### Compare to SDLRenderer
 
@@ -960,11 +967,13 @@ VkSurfaceFormatKHR VKRenderer::chooseSwapSurfaceFormat(const std::vector<VkSurfa
 
 `chooseSwapPresentMode` selects how images are presented to the screen. The available modes have different latency and tearing characteristics:
 
-| Mode | Description |
-|------|-------------|
-| `FIFO` | VSync — guaranteed available on all hardware, no tearing, but adds latency |
-| `MAILBOX` | Triple buffer — GPU keeps rendering, only the newest image gets displayed. Low latency, no tearing |
-| `IMMEDIATE` | No waiting at all — lowest latency but may tear |
+
+| Mode        | Description                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `FIFO`      | VSync — guaranteed available on all hardware, no tearing, but adds latency                         |
+| `MAILBOX`   | Triple buffer — GPU keeps rendering, only the newest image gets displayed. Low latency, no tearing |
+| `IMMEDIATE` | No waiting at all — lowest latency but may tear                                                    |
+
 
 We prefer `MAILBOX` for its low-latency-without-tearing property. `FIFO` is the safe fallback since the Vulkan spec guarantees it's always supported:
 
@@ -1287,7 +1296,7 @@ VkShaderModule VKRenderer::createShaderModule(const std::vector<char>& code) {
 
 ### Key Concepts
 
-**`gl_VertexIndex`**: Built-in variable that tells the vertex shader which vertex is being processed (0, 1, or 2 for our triangle).
+`**gl_VertexIndex**`: Built-in variable that tells the vertex shader which vertex is being processed (0, 1, or 2 for our triangle).
 
 **Shader modules are temporary**: You create them to build the pipeline, then destroy them immediately after. The pipeline keeps its own copy of the compiled code.
 
@@ -1347,6 +1356,7 @@ viewportState.scissorCount = 1;
 ### Rasterizer
 
 The rasterizer converts the triangles defined by the vertex shader into fragments (pixel-sized pieces) that the fragment shader will color. Key fields:
+
 - `depthClampEnable` — if `VK_TRUE`, fragments beyond the near/far planes are clamped instead of discarded (useful for shadow maps, requires a GPU feature)
 - `rasterizerDiscardEnable` — if `VK_TRUE`, geometry never passes through rasterization, effectively disabling output (useful for transform feedback)
 - `polygonMode` — `FILL` fills triangles, `LINE` draws wireframe, `POINT` draws vertices only
@@ -1489,18 +1499,23 @@ Subpass dependencies define execution ordering between subpasses (or between a s
 
 **Load/Store operations**:
 
-| loadOp | Description |
-|--------|-------------|
-| `CLEAR` | Clear to a value at start |
-| `LOAD` | Preserve existing contents |
+
+| loadOp      | Description                  |
+| ----------- | ---------------------------- |
+| `CLEAR`     | Clear to a value at start    |
+| `LOAD`      | Preserve existing contents   |
 | `DONT_CARE` | Contents undefined (fastest) |
 
-| storeOp | Description |
-|---------|-------------|
-| `STORE` | Keep results |
+
+
+| storeOp     | Description              |
+| ----------- | ------------------------ |
+| `STORE`     | Keep results             |
 | `DONT_CARE` | Contents undefined after |
 
+
 **Image layouts**: Images must be in specific layouts for different operations:
+
 - `UNDEFINED` — don't care about previous contents
 - `COLOR_ATTACHMENT_OPTIMAL` — best for rendering to
 - `PRESENT_SRC_KHR` — ready for presentation
@@ -1840,10 +1855,12 @@ Now we implement `beginFrame()` and `endFrame()` — the core frame loop.
 
 ### Synchronization Primitives
 
-| Primitive | Scope | Use Case |
-|-----------|-------|----------|
-| **Fence** | CPU ↔ GPU | CPU waits for GPU to finish a frame |
-| **Semaphore** | GPU ↔ GPU | Signal between queue operations |
+
+| Primitive     | Scope     | Use Case                            |
+| ------------- | --------- | ----------------------------------- |
+| **Fence**     | CPU ↔ GPU | CPU waits for GPU to finish a frame |
+| **Semaphore** | GPU ↔ GPU | Signal between queue operations     |
+
 
 ### The Frame Sync Flow
 
@@ -1918,6 +1935,7 @@ void VKRenderer::beginFrame() {
 ```
 
 `endFrame()` submits the recorded command buffer and presents the result. The submit info orchestrates GPU-GPU synchronization:
+
 - `pWaitSemaphores` / `pWaitDstStageMask`: wait for `imageAvailable` before the color attachment output stage (don't write pixels until the image is ready)
 - `pSignalSemaphores`: signal `renderFinished` when rendering completes
 - The fence parameter signals `inFlightFences[currentFrame]` when the GPU finishes, so the next time this frame slot comes around, `beginFrame` can wait on it:

@@ -41,6 +41,18 @@ public:
 
 private:
 
+    // ------- Inner Types / Structs -------
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> presentFamily;
+
+        bool isComplete() const {
+            return graphicsFamily.has_value() && presentFamily.has_value();
+        }
+    };
+
+    // ------- Functions -------
+
     /**
      * @brief Creates the VkInstance, enabling required SDL and debug extensions.
      * @details Also attaches a temporary debug messenger via pNext to catch errors
@@ -70,7 +82,11 @@ private:
      */
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
+    void pickPhysicalDevice();
 
+    bool isDeviceSuitable(VkPhysicalDevice device);
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     // ------- Static Functions -------
 
     /**
@@ -131,6 +147,8 @@ private:
 
     VkInstance instance = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
     VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // TODO RAII this as a struct/class member
+
 
     SDL_Window* window = nullptr;
     uint32_t currentFrame = 0;
