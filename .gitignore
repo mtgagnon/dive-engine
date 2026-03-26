@@ -2,7 +2,7 @@
 builds/*
 
 # cursor files
-.cursor/
+# .cursor/
 
 # Allow specific files in the 'build' directory
 !builds/.gitkeep
