@@ -1,6 +1,6 @@
 # Vulkan Tutorial for Dive Engine — Part 1: Drawing a Triangle
 
-This tutorial follows [vulkan-tutorial.com](https://vulkan-tutorial.com/), adapted for the Dive Engine (SDL2 instead of GLFW, building up `VKRenderer`). By the end of Part 1 you will have a hardcoded colorful triangle on screen with validation layers, proper synchronization, and frames in flight.
+This tutorial follows [vulkan-tutorial.com](https://vulkan-tutorial.com/) and the [official Khronos Vulkan Tutorial](https://docs.vulkan.org/tutorial/latest/00_Introduction.html), adapted for the Dive Engine (SDL2 instead of GLFW, building up `VKRenderer`). We target **Vulkan 1.3** and use **dynamic rendering** — the modern approach that eliminates `VkRenderPass` and `VkFramebuffer` objects in favor of inline `vkCmdBeginRendering`/`vkCmdEndRendering` calls. By the end of Part 1 you will have a hardcoded colorful triangle on screen with validation layers, proper synchronization, and frames in flight.
 
 ## Table of Contents
 
@@ -25,15 +25,14 @@ This tutorial follows [vulkan-tutorial.com](https://vulkan-tutorial.com/), adapt
 11. [Introduction to the Graphics Pipeline](#11-introduction-to-the-graphics-pipeline)
 12. [Shader Modules](#12-shader-modules)
 13. [Fixed Functions](#13-fixed-functions)
-14. [Render Passes](#14-render-passes)
+14. [Image Layout Transitions](#14-image-layout-transitions)
 15. [Pipeline Conclusion](#15-pipeline-conclusion)
 
 **Drawing**
-16. [Framebuffers](#16-framebuffers)
-17. [Command Buffers](#17-command-buffers)
-18. [Rendering and Presentation](#18-rendering-and-presentation)
-19. [Frames in Flight](#19-frames-in-flight)
-20. [Full Code Checkpoint](#20-full-code-checkpoint)
+16. [Command Buffers](#16-command-buffers)
+17. [Rendering and Presentation](#17-rendering-and-presentation)
+18. [Frames in Flight](#18-frames-in-flight)
+19. [Full Code Checkpoint](#19-full-code-checkpoint)
 
 ---
 
@@ -51,29 +50,31 @@ SDL_RenderPresent()     // Show frame
 
 SDL hides all GPU details. You say "draw this texture here" and it happens.
 
-### Vulkan Flow
+### Vulkan Flow (Dynamic Rendering — Vulkan 1.3)
 
 ```cpp
 vkCreateInstance()           // Connect to Vulkan driver
 SDL_Vulkan_CreateSurface()   // Create drawable surface
 vkCreateDevice()             // Create logical GPU connection
 vkCreateSwapchainKHR()       // Create image buffers for double/triple buffering
-vkCreateRenderPass()         // Define how rendering works
 vkCreateGraphicsPipelines()  // Create shader pipeline
-vkCreateFramebuffer()        // Connect swapchain images to render pass
 vkAllocateCommandBuffers()   // Allocate command recording space
 
 // Per frame:
 vkAcquireNextImageKHR()      // Get next swapchain image
 vkBeginCommandBuffer()       // Start recording commands
-vkCmdBeginRenderPass()       // Begin render pass
+// Barrier: transition image to COLOR_ATTACHMENT_OPTIMAL
+vkCmdBeginRendering()        // Begin dynamic rendering (specify attachments inline)
 vkCmdBindPipeline()          // Bind shader pipeline
 vkCmdDraw()                  // Record draw command
-vkCmdEndRenderPass()         // End render pass
+vkCmdEndRendering()          // End dynamic rendering
+// Barrier: transition image to PRESENT_SRC_KHR
 vkEndCommandBuffer()         // Stop recording
 vkQueueSubmit()              // Submit to GPU
 vkQueuePresentKHR()          // Present to screen
 ```
+
+Notice we no longer create `VkRenderPass` or `VkFramebuffer` objects. With dynamic rendering, attachments are specified inline when recording commands, and image layout transitions are handled explicitly via barriers.
 
 **Key difference:** In SDL you call "draw" and it draws immediately. In Vulkan you *record* commands into a buffer, then *submit* that buffer to the GPU.
 
@@ -117,13 +118,15 @@ This verbosity enables better performance, predictable behavior, and cross-platf
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                                 │
-                ┌───────────────┼───────────────┐
-                ▼               ▼               ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
-│  VkRenderPass   │ │   VkPipeline    │ │    VkCommandPool        │
-│  (How to render)│ │ (Shader config) │ │  (Command allocation)   │
-└─────────────────┘ └─────────────────┘ └─────────────────────────┘
+                        ┌───────┴───────┐
+                        ▼               ▼
+              ┌─────────────────┐ ┌─────────────────────────┐
+              │   VkPipeline    │ │    VkCommandPool        │
+              │ (Shader config) │ │  (Command allocation)   │
+              └─────────────────┘ └─────────────────────────┘
 ```
+
+With **dynamic rendering** (Vulkan 1.3), `VkRenderPass` and `VkFramebuffer` are no longer needed. Attachments (color, depth) are specified inline when recording commands via `vkCmdBeginRendering`. Image layout transitions are handled explicitly using pipeline barriers.
 
 ### Object Relationships
 
@@ -136,7 +139,6 @@ This verbosity enables better performance, predictable behavior, and cross-platf
 | `VkDevice`         | Logical GPU connection       | App lifetime              |
 | `VkQueue`          | Command submission endpoint  | Device lifetime           |
 | `VkSwapchainKHR`   | Image buffers for presenting | Can be recreated (resize) |
-| `VkRenderPass`     | Describes render operation   | Pipeline lifetime         |
 | `VkPipeline`       | Shader + state config        | App lifetime (usually)    |
 | `VkCommandBuffer`  | Recorded GPU commands        | Per-frame or reusable     |
 
@@ -245,7 +247,7 @@ Add to `VKRenderer.cpp`:
 #include <cstring>
 ```
 
-The first thing `createInstance` does is fill in a `VkApplicationInfo` struct. Most of these fields are informational metadata that drivers *may* use for optimization (e.g., well-known engines might get driver-specific fast paths), but `apiVersion` is the important one — it tells Vulkan which version of the API your app expects. We use `VK_API_VERSION_1_2` since it's widely supported and includes features we'll want later:
+The first thing `createInstance` does is fill in a `VkApplicationInfo` struct. Most of these fields are informational metadata that drivers *may* use for optimization (e.g., well-known engines might get driver-specific fast paths), but `apiVersion` is the important one — it tells Vulkan which version of the API your app expects. We use `VK_API_VERSION_1_3` because it includes dynamic rendering and synchronization2 as core features, and is supported by all modern drivers (NVIDIA, AMD, Intel on Linux/Windows, and MoltenVK 1.3+ on macOS):
 
 ```cpp
 void VKRenderer::createInstance() {
@@ -255,7 +257,7 @@ void VKRenderer::createInstance() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Dive Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 ```
 
 Next we need to find out which Vulkan extensions are required. Vulkan is modular — the core API doesn't know about windows or surfaces. SDL knows which platform-specific surface extensions are needed (e.g., `VK_KHR_surface` plus `VK_KHR_xlib_surface` on Linux X11, or `VK_MVK_macos_surface` on macOS). We use the two-call enumerate pattern: first call with `nullptr` to get the count, then call again with a sized vector to get the names:
@@ -506,7 +508,7 @@ void VKRenderer::createInstance() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Dive Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 ```
 
 When validation is enabled, we add the `VK_EXT_debug_utils` extension to our extension list. This is the extension that provides the debug messenger API:
@@ -772,11 +774,21 @@ Next we declare which device features and extensions we need. `VkPhysicalDeviceF
     };
 ```
 
-Now we assemble the device create info and create the logical device. Note that device-level validation layers are deprecated in modern Vulkan (validation is per-instance now), but we still set them for compatibility with older implementations:
+Since we're targeting Vulkan 1.3, we can enable features that were promoted to core. `VkPhysicalDeviceVulkan13Features` lets us turn on `dynamicRendering` (so we can use `vkCmdBeginRendering` instead of render passes) and `synchronization2` (so we can use `VkImageMemoryBarrier2` and `vkCmdPipelineBarrier2` for cleaner, more explicit barrier code). We chain this features struct via `pNext` on the device create info — this is the standard Vulkan extension mechanism where structs form a linked list:
+
+```cpp
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.dynamicRendering = VK_TRUE;
+    features13.synchronization2 = VK_TRUE;
+```
+
+Now we assemble the device create info and create the logical device. The `pNext` chain connects our Vulkan 1.3 features struct. Note that when using `pNext` features structs, `pEnabledFeatures` still works for the base `VkPhysicalDeviceFeatures` — both mechanisms coexist. Device-level validation layers are deprecated in modern Vulkan (validation is per-instance now), but we still set them for compatibility with older implementations:
 
 ```cpp
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pNext = &features13;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
@@ -1183,10 +1195,10 @@ Vertex Data
 └──────────────────┘
     ↓
 ┌──────────────────┐
-│  Color Blending   │  ← Combines fragments with framebuffer          [FIXED]
+│  Color Blending   │  ← Combines fragments with color attachment   [FIXED]
 └──────────────────┘
     ↓
-  Framebuffer
+  Swapchain image (color attachment)
 ```
 
 **Vulkan pipelines are immutable** — you can't change settings after creation. If you need different shaders or blend modes, create a separate pipeline. This allows the driver to optimize aggressively.
@@ -1423,104 +1435,84 @@ pipelineLayoutInfo.pushConstantRangeCount = 0;
 
 ---
 
-## 14. Render Passes
+## 14. Image Layout Transitions
 
-A render pass describes what attachments (color, depth) are used, how they're loaded/stored, and what subpasses exist.
+With dynamic rendering, there's no `VkRenderPass` to automatically transition image layouts for us. Instead, we manage layout transitions explicitly using **pipeline barriers**. This gives us more control and is actually simpler to understand — you see exactly when and why each transition happens.
+
+### Image Layouts
+
+Vulkan images must be in specific layouts for different operations. The three layouts we care about for rendering:
+
+| Layout | Use |
+| --- | --- |
+| `VK_IMAGE_LAYOUT_UNDEFINED` | Unknown/don't care about previous contents |
+| `VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL` | Best layout for rendering into |
+| `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR` | Ready for presentation to the screen |
+
+Each frame, a swapchain image goes through this cycle:
+
+```
+UNDEFINED → COLOR_ATTACHMENT_OPTIMAL → (render) → PRESENT_SRC_KHR → (present)
+```
 
 ### Code
 
 Add to `VKRenderer.h` (private section):
 
 ```cpp
-VkRenderPass renderPass = VK_NULL_HANDLE;
-
-void createRenderPass();
+void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
+    VkImageLayout oldLayout, VkImageLayout newLayout,
+    VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+    VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
 ```
 
 Add to `VKRenderer.cpp`:
 
-First we describe the color attachment — the swapchain image we'll render into. `loadOp` controls what happens to the attachment at the start of the render pass: `CLEAR` fills it with a color (we'll specify the clear color when recording commands). `storeOp = STORE` means we keep the rendered contents (as opposed to `DONT_CARE` which discards them — useful for depth buffers).
+This helper uses the Vulkan 1.3 synchronization2 API (`VkImageMemoryBarrier2` + `vkCmdPipelineBarrier2`), which is cleaner than the legacy barrier API. The barrier struct combines the old and new layouts with access masks and pipeline stages into a single declaration.
 
-The `initialLayout` is the layout the image is in when the render pass begins. `UNDEFINED` means we don't care about previous contents (the clear will overwrite everything anyway). `finalLayout` is what the driver transitions the image to after the render pass — `PRESENT_SRC_KHR` makes it ready for presentation to the screen:
-
-```cpp
-void VKRenderer::createRenderPass() {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapchainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-```
-
-A subpass is a rendering operation within the render pass. Even though we only have one subpass, Vulkan requires you to define it explicitly. The attachment reference connects this subpass to attachment 0 (our color attachment) and specifies the optimal layout for writing color data. The `layout(location = 0) out vec4 outColor` in the fragment shader maps to `pColorAttachments[0]`:
+`srcStageMask` / `srcAccessMask` describe what must finish before the transition. `dstStageMask` / `dstAccessMask` describe what must wait until after the transition. The `subresourceRange` specifies which part of the image is affected — for our swapchain images, that's the entire color aspect at mip level 0, layer 0:
 
 ```cpp
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+void VKRenderer::transitionImageLayout(VkCommandBuffer cmd, VkImage image,
+    VkImageLayout oldLayout, VkImageLayout newLayout,
+    VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+    VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage)
+{
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = srcStage;
+    barrier.srcAccessMask = srcAccess;
+    barrier.dstStageMask = dstStage;
+    barrier.dstAccessMask = dstAccess;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
 
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-```
+    VkDependencyInfo depInfo{};
+    depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers = &barrier;
 
-Subpass dependencies define execution ordering between subpasses (or between a subpass and external commands). `VK_SUBPASS_EXTERNAL` refers to the implicit operations that happen before/after the render pass — in this case, the swapchain image layout transition. This dependency says: "don't start writing to the color attachment until the image is available from the swapchain." Without it, we might try to render into an image the presentation engine is still reading:
-
-```cpp
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass");
-    }
+    vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 ```
 
+`srcQueueFamilyIndex` / `dstQueueFamilyIndex` are for transferring ownership between queue families — `VK_QUEUE_FAMILY_IGNORED` means no transfer. `VkDependencyInfo` wraps the barrier (or multiple barriers) and is submitted via `vkCmdPipelineBarrier2`.
+
+We'll call this helper twice per frame in `recordCommandBuffer` (Section 16): once to transition from `UNDEFINED` to `COLOR_ATTACHMENT_OPTIMAL` before rendering, and once to transition from `COLOR_ATTACHMENT_OPTIMAL` to `PRESENT_SRC_KHR` after rendering.
+
 ### Key Concepts
 
-**Load/Store operations**:
+**Why UNDEFINED as the source?** We specify `UNDEFINED` as the old layout because we don't care about the image's previous contents — we're about to clear and overwrite everything. This avoids a read-dependency on whatever layout the image was in before, which is a free optimization.
 
-
-| loadOp      | Description                  |
-| ----------- | ---------------------------- |
-| `CLEAR`     | Clear to a value at start    |
-| `LOAD`      | Preserve existing contents   |
-| `DONT_CARE` | Contents undefined (fastest) |
-
-
-
-| storeOp     | Description              |
-| ----------- | ------------------------ |
-| `STORE`     | Keep results             |
-| `DONT_CARE` | Contents undefined after |
-
-
-**Image layouts**: Images must be in specific layouts for different operations:
-
-- `UNDEFINED` — don't care about previous contents
-- `COLOR_ATTACHMENT_OPTIMAL` — best for rendering to
-- `PRESENT_SRC_KHR` — ready for presentation
-
-**Subpass dependency**: `VK_SUBPASS_EXTERNAL` refers to commands before the render pass. The dependency ensures the swap chain image transition happens before we try to write to it.
+**Synchronization2 vs legacy barriers**: The legacy `vkCmdPipelineBarrier` takes stage masks and access masks as separate function parameters. Vulkan 1.3's `vkCmdPipelineBarrier2` bundles everything into the barrier struct itself, making it easier to read and less error-prone.
 
 ---
 
@@ -1643,13 +1635,23 @@ The pipeline layout defines the interface between shaders and the data they acce
     }
 ```
 
-Finally, the `VkGraphicsPipelineCreateInfo` brings everything together — shader stages, all fixed-function state, layout, and render pass. The `subpass = 0` specifies which subpass in the render pass this pipeline will be used with. The second parameter to `vkCreateGraphicsPipelines` is an optional pipeline cache that speeds up pipeline creation across runs (we pass `VK_NULL_HANDLE` for now).
+With dynamic rendering, the pipeline no longer references a `VkRenderPass`. Instead, we tell the pipeline which attachment formats to expect via a `VkPipelineRenderingCreateInfo` struct chained to `pNext`. This struct specifies the number and format of color attachments (and optionally depth/stencil formats — we'll add those in Part 3). The pipeline uses this information to ensure shader outputs are compatible with the attachments we'll specify at draw time:
+
+```cpp
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachmentFormats = &swapchainImageFormat;
+```
+
+Now we assemble the `VkGraphicsPipelineCreateInfo`. Notice `pNext` points to our `VkPipelineRenderingCreateInfo`, and `renderPass` is `VK_NULL_HANDLE` — this is the signal to the driver that we're using dynamic rendering. The second parameter to `vkCreateGraphicsPipelines` is an optional pipeline cache that speeds up pipeline creation across runs (we pass `VK_NULL_HANDLE` for now).
 
 After creating the pipeline, we destroy the shader modules — the pipeline has its own copy of the compiled shader code, so the modules are no longer needed:
 
 ```cpp
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -1660,8 +1662,7 @@ After creating the pipeline, we destroy the shader modules — the pipeline has 
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
 
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline");
@@ -1676,54 +1677,7 @@ After creating the pipeline, we destroy the shader modules — the pipeline has 
 
 # Drawing
 
-## 16. Framebuffers
-
-A framebuffer connects your render pass to actual images. Each swap chain image needs its own framebuffer.
-
-### Code
-
-Add to `VKRenderer.h` (private section):
-
-```cpp
-std::vector<VkFramebuffer> swapchainFramebuffers;
-
-void createFramebuffers();
-```
-
-Add to `VKRenderer.cpp`:
-
-```cpp
-void VKRenderer::createFramebuffers() {
-    swapchainFramebuffers.resize(swapchainImageViews.size());
-
-    for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-        VkImageView attachments[] = { swapchainImageViews[i] };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapchainExtent.width;
-        framebufferInfo.height = swapchainExtent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create framebuffer");
-        }
-    }
-}
-```
-
-### Key Concepts
-
-**One framebuffer per swap chain image**: If you have 3 swap chain images (triple buffering), you create 3 framebuffers.
-
-**Attachment order**: The `pAttachments` array must match the order of attachments in the render pass. When you add a depth buffer later (Part 3), you'll pass two attachments.
-
----
-
-## 17. Command Buffers
+## 16. Command Buffers
 
 Commands in Vulkan aren't executed immediately. You record them into a command buffer, then submit that buffer to a queue.
 
@@ -1779,7 +1733,9 @@ void VKRenderer::createCommandBuffers() {
 }
 ```
 
-`recordCommandBuffer` is where the actual rendering commands go. First we begin the command buffer, then begin the render pass. The render pass needs to know which framebuffer to target (selected by `imageIndex` — the swapchain image we acquired) and the clear color to use (dark blueish gray). `VK_SUBPASS_CONTENTS_INLINE` means we'll record commands directly into this primary buffer rather than calling secondary buffers:
+`recordCommandBuffer` is where the actual rendering commands go. With dynamic rendering, there's no render pass or framebuffer — instead we transition the image layout manually, then tell Vulkan to begin rendering directly to our swapchain image view.
+
+First we begin the command buffer, then transition the swapchain image from `UNDEFINED` to `COLOR_ATTACHMENT_OPTIMAL`. We use `UNDEFINED` as the source because we don't care about the image's previous contents (the clear will overwrite everything). The barrier ensures the transition completes before we start writing color data:
 
 ```cpp
 void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
@@ -1790,21 +1746,39 @@ void VKRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
         throw std::runtime_error("Failed to begin recording command buffer");
     }
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapchainFramebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = swapchainExtent;
-
-    VkClearValue clearColor = {{{0.1f, 0.1f, 0.15f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    transitionImageLayout(commandBuffer, swapchainImages[imageIndex],
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        0, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 ```
 
-After beginning the render pass, we bind our graphics pipeline, then set the viewport and scissor dynamically (since we declared them as dynamic state in the pipeline). The viewport maps normalized device coordinates to pixel coordinates. The scissor defines which region of the framebuffer can be written to — pixels outside the scissor are discarded:
+Now we set up dynamic rendering. `VkRenderingAttachmentInfo` describes the color attachment — which image view to render into, what layout it's in, and how to handle load/store operations. `loadOp = CLEAR` fills the attachment with our clear color at the start. `storeOp = STORE` preserves the rendered contents (we need them for presentation). This replaces the `VkAttachmentDescription` and `VkFramebuffer` from the old render pass approach:
+
+```cpp
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.imageView = swapchainImageViews[imageIndex];
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue.color = {{{0.1f, 0.1f, 0.15f, 1.0f}}};
+```
+
+`VkRenderingInfo` combines the attachment(s) with the render area and layer count. This is a flat, stack-allocated struct — no need for a pre-created `VkRenderPass` or `VkFramebuffer` object. `layerCount = 1` is for non-multiview rendering:
+
+```cpp
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.renderArea.offset = {0, 0};
+    renderInfo.renderArea.extent = swapchainExtent;
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &colorAttachment;
+
+    vkCmdBeginRendering(commandBuffer, &renderInfo);
+```
+
+After beginning rendering, we bind our graphics pipeline and set the viewport and scissor dynamically. The viewport maps normalized device coordinates to pixel coordinates. The scissor defines which region can be written to — pixels outside are discarded:
 
 ```cpp
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -1824,12 +1798,17 @@ After beginning the render pass, we bind our graphics pipeline, then set the vie
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 ```
 
-Finally, the draw call and cleanup. `vkCmdDraw(commandBuffer, 3, 1, 0, 0)` means: draw 3 vertices, 1 instance, starting from vertex index 0 and instance index 0. Since our vertices are hardcoded in the shader, the vertex count is all Vulkan needs to know. After drawing, we end the render pass and finalize the command buffer:
+The draw call: `vkCmdDraw(commandBuffer, 3, 1, 0, 0)` means draw 3 vertices, 1 instance, starting from vertex index 0 and instance index 0. After drawing, we end rendering and transition the image to `PRESENT_SRC_KHR` so the presentation engine can display it. The barrier ensures all color writes finish before the image is presented:
 
 ```cpp
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
-    vkCmdEndRenderPass(commandBuffer);
+    vkCmdEndRendering(commandBuffer);
+
+    transitionImageLayout(commandBuffer, swapchainImages[imageIndex],
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, 0,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer");
@@ -1844,12 +1823,14 @@ SDLRenderer: "Draw this now"
   SDL_RenderCopy(renderer, texture, &src, &dst);
 
 Vulkan: "Record this command, I'll submit it later"
-  vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
+  vkCmdBeginRendering(...)   // specify attachments inline
+  vkCmdDraw(...)             // record draw command
+  vkCmdEndRendering(...)     // done with this render target
 ```
 
 ---
 
-## 18. Rendering and Presentation
+## 17. Rendering and Presentation
 
 Now we implement `beginFrame()` and `endFrame()` — the core frame loop.
 
@@ -1996,9 +1977,9 @@ Vulkan: you manage all synchronization
 
 ---
 
-## 19. Frames in Flight
+## 18. Frames in Flight
 
-The sync objects and double-buffering pattern from Section 18 implement "frames in flight." With `MAX_FRAMES_IN_FLIGHT = 2`:
+The sync objects and double-buffering pattern from Section 17 implement "frames in flight." With `MAX_FRAMES_IN_FLIGHT = 2`:
 
 - Frame slot 0 and frame slot 1 alternate
 - Each has its own command buffer, semaphores, and fence
@@ -2009,7 +1990,7 @@ This is already implemented above. The key insight is that `MAX_FRAMES_IN_FLIGHT
 
 ---
 
-## 20. Full Code Checkpoint
+## 19. Full Code Checkpoint
 
 At this point, your `initialize()` and `cleanup()` should look like this:
 
@@ -2072,13 +2053,11 @@ private:
     VkExtent2D swapchainExtent;
     std::vector<VkImageView> swapchainImageViews;
 
-    // Pipeline
-    VkRenderPass renderPass = VK_NULL_HANDLE;
+    // Pipeline (no VkRenderPass needed — dynamic rendering)
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
 
-    // Drawing
-    std::vector<VkFramebuffer> swapchainFramebuffers;
+    // Drawing (no VkFramebuffer needed — dynamic rendering)
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers;
 
@@ -2101,15 +2080,19 @@ private:
     void createImageViews();
 
     // Pipeline
-    void createRenderPass();
     void createGraphicsPipeline();
 
     // Drawing
-    void createFramebuffers();
     void createCommandPool();
     void createCommandBuffers();
     void createSyncObjects();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
+    // Image layout transitions (replaces render pass automatic transitions)
+    void transitionImageLayout(VkCommandBuffer cmd, VkImage image,
+        VkImageLayout oldLayout, VkImageLayout newLayout,
+        VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+        VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
 
     // Helpers
     bool checkValidationLayerSupport();
@@ -2135,6 +2118,8 @@ private:
 
 ### `VKRenderer::initialize()` and `VKRenderer::cleanup()`
 
+Notice the shorter initialization — no `createRenderPass()` or `createFramebuffers()`. Dynamic rendering eliminates both of those setup steps:
+
 ```cpp
 void VKRenderer::initialize(SDL_Window* win) {
     window = win;
@@ -2146,9 +2131,7 @@ void VKRenderer::initialize(SDL_Window* win) {
     createLogicalDevice();
     createSwapchain();
     createImageViews();
-    createRenderPass();
     createGraphicsPipeline();
-    createFramebuffers();
     createCommandPool();
     createCommandBuffers();
     createSyncObjects();
@@ -2156,7 +2139,11 @@ void VKRenderer::initialize(SDL_Window* win) {
     initialized = true;
     std::cout << "VKRenderer initialized!" << std::endl;
 }
+```
 
+Cleanup is simpler too — no render pass or framebuffers to destroy:
+
+```cpp
 void VKRenderer::cleanup() {
     vkDeviceWaitIdle(device);
 
@@ -2168,13 +2155,8 @@ void VKRenderer::cleanup() {
 
     vkDestroyCommandPool(device, commandPool, nullptr);
 
-    for (auto framebuffer : swapchainFramebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
-
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-    vkDestroyRenderPass(device, renderPass, nullptr);
 
     for (auto imageView : swapchainImageViews) {
         vkDestroyImageView(device, imageView, nullptr);

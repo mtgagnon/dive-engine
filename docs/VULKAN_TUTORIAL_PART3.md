@@ -20,8 +20,8 @@ Without a depth buffer, triangles are drawn in submission order — back faces c
 
 1. A `VkImage` for depth data
 2. A `VkImageView` for the depth image
-3. Update the render pass to include a depth attachment
-4. Update framebuffers to include the depth image view
+3. Add a depth attachment to `VkRenderingInfo` in `recordCommandBuffer`
+4. Update `VkPipelineRenderingCreateInfo` to include the depth format
 5. Add depth-stencil state to the pipeline
 
 ### Finding a Depth Format
@@ -61,7 +61,7 @@ VkFormat VKRenderer::findDepthFormat() {
 
 ### Creating Depth Resources
 
-The depth image is similar to a texture image, but it uses a depth format and is only used as an attachment (never sampled by shaders). The image must match the swapchain extent since there's one depth value per pixel. `DEPTH_STENCIL_ATTACHMENT_BIT` tells Vulkan this image will be used as a depth/stencil buffer in a render pass:
+The depth image is similar to a texture image, but it uses a depth format and is only used as an attachment (never sampled by shaders). The image must match the swapchain extent since there's one depth value per pixel. `DEPTH_STENCIL_ATTACHMENT_BIT` tells Vulkan this image will be used as a depth/stencil attachment during rendering:
 
 ```cpp
 void VKRenderer::createDepthResources() {
@@ -112,113 +112,55 @@ The image view for the depth image uses `VK_IMAGE_ASPECT_DEPTH_BIT` instead of `
 }
 ```
 
-### Updating the Render Pass
+### Adding Depth to Dynamic Rendering
 
-The render pass needs a second attachment for depth. The depth attachment's `storeOp = DONT_CARE` means we don't need the depth data after the render pass completes — the driver can discard it for better performance. Its `finalLayout` stays as `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` since we're not presenting or sampling from the depth buffer:
+With dynamic rendering, there's no render pass or framebuffer to update. Instead, we add a depth attachment directly to the `VkRenderingInfo` struct in `recordCommandBuffer`. First, we need to transition the depth image to the correct layout. We can reuse the `transitionImageLayout` helper from Part 1, but we need to set `aspectMask` to `VK_IMAGE_ASPECT_DEPTH_BIT` for depth images. A simple approach is to add the depth transition right before `vkCmdBeginRendering`:
 
 ```cpp
-void VKRenderer::createRenderPass() {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapchainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+// In recordCommandBuffer, after the color image transition:
 
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = findDepthFormat();
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+// Transition depth image to optimal layout for depth attachment
+transitionImageLayout(commandBuffer, depthImage,
+    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    0, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
 ```
 
-The subpass now references both attachments. `pDepthStencilAttachment` is singular (not an array) because a subpass can have at most one depth/stencil attachment. The reference points to attachment index 1 (matching the order in the attachments array):
+> **Note**: The `transitionImageLayout` helper from Part 1 uses `VK_IMAGE_ASPECT_COLOR_BIT` in the barrier. For depth images, you'll need to either pass the aspect mask as a parameter, or create a depth-specific version. The simplest approach is to add an optional `aspectMask` parameter defaulting to `VK_IMAGE_ASPECT_COLOR_BIT`.
+
+Then set up the depth attachment info alongside the color attachment:
 
 ```cpp
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+VkRenderingAttachmentInfo depthAttachment{};
+depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+depthAttachment.imageView = depthImageView;
+depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+depthAttachment.clearValue.depthStencil = {1.0f, 0};
 ```
 
-The dependency now includes `EARLY_FRAGMENT_TESTS_BIT` in both stage masks and `DEPTH_STENCIL_ATTACHMENT_WRITE_BIT` in the destination access mask. This ensures the depth image layout transition completes before the early fragment tests try to read/write depth values:
+`storeOp = DONT_CARE` means we don't need the depth data after rendering completes — the driver can discard it for better performance. The clear value of `1.0f` means "infinitely far" — any rendered fragment will be closer and pass the depth test.
+
+Add `pDepthAttachment` to the `VkRenderingInfo`:
 
 ```cpp
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+VkRenderingInfo renderInfo{};
+renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+renderInfo.renderArea.offset = {0, 0};
+renderInfo.renderArea.extent = swapchainExtent;
+renderInfo.layerCount = 1;
+renderInfo.colorAttachmentCount = 1;
+renderInfo.pColorAttachments = &colorAttachment;
+renderInfo.pDepthAttachment = &depthAttachment;
 
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create render pass");
-    }
-}
-```
-
-### Updating Framebuffers
-
-```cpp
-void VKRenderer::createFramebuffers() {
-    swapchainFramebuffers.resize(swapchainImageViews.size());
-
-    for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-        std::array<VkImageView, 2> attachments = {
-            swapchainImageViews[i],
-            depthImageView
-        };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = swapchainExtent.width;
-        framebufferInfo.height = swapchainExtent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapchainFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create framebuffer");
-        }
-    }
-}
+vkCmdBeginRendering(commandBuffer, &renderInfo);
 ```
 
 ### Updating the Pipeline
 
-Add depth-stencil state to `createGraphicsPipeline()`:
+Add depth-stencil state to `createGraphicsPipeline()`. `depthTestEnable` turns on depth comparisons — without this, fragments are drawn in submission order regardless of distance. `depthWriteEnable` lets passing fragments update the depth buffer. `VK_COMPARE_OP_LESS` means a fragment passes only if its depth is less than the stored value (closer to camera wins):
 
 ```cpp
 VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -233,20 +175,24 @@ depthStencil.stencilTestEnable = VK_FALSE;
 pipelineInfo.pDepthStencilState = &depthStencil;
 ```
 
-### Updating recordCommandBuffer for Depth Clear
+Also update the `VkPipelineRenderingCreateInfo` (from Part 1) to include the depth format. This tells the pipeline what depth attachment format to expect during dynamic rendering:
 
 ```cpp
-std::array<VkClearValue, 2> clearValues{};
-clearValues[0].color = {{{0.1f, 0.1f, 0.15f, 1.0f}}};
-clearValues[1].depthStencil = {1.0f, 0};
+VkFormat depthFormat = findDepthFormat();
 
-renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-renderPassInfo.pClearValues = clearValues.data();
+VkPipelineRenderingCreateInfo renderingInfo{};
+renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+renderingInfo.colorAttachmentCount = 1;
+renderingInfo.pColorAttachmentFormats = &swapchainImageFormat;
+renderingInfo.depthAttachmentFormat = depthFormat;
+
+pipelineInfo.pNext = &renderingInfo;
+pipelineInfo.renderPass = VK_NULL_HANDLE;
 ```
 
 ### Init Order
 
-Call `createDepthResources()` after `createSwapchain()` and `createImageViews()`, but before `createRenderPass()` and `createFramebuffers()`.
+Call `createDepthResources()` after `createSwapchain()` and `createImageViews()`, but before `createGraphicsPipeline()` (since the pipeline now needs the depth format).
 
 ### Key Concepts
 
@@ -257,6 +203,8 @@ Call `createDepthResources()` after `createSwapchain()` and `createImageViews()`
 **`depthCompareOp = LESS`**: A fragment passes the depth test if its depth is LESS than the stored value (closer to camera wins).
 
 **Depth storeOp = DONT_CARE**: We don't need the depth data after rendering is complete, so the driver can discard it for better performance.
+
+**Dynamic rendering depth**: Instead of embedding depth attachment info in a render pass, we specify it inline in `VkRenderingInfo::pDepthAttachment`. The depth image layout transition is handled manually via `transitionImageLayout`, just like the color image.
 
 ---
 
@@ -436,16 +384,12 @@ void recreateSwapchain();
 void cleanupSwapchain();
 ```
 
-`cleanupSwapchain` destroys everything that depends on the swapchain's size or images: the depth resources (sized to match the swapchain), framebuffers (reference swapchain image views), image views (wrap swapchain images), and the swapchain itself. Note the order — dependents are destroyed before the things they depend on:
+`cleanupSwapchain` destroys everything that depends on the swapchain's size or images: the depth resources (sized to match the swapchain), image views (wrap swapchain images), and the swapchain itself. With dynamic rendering there are no framebuffers to clean up — that's one less category of objects to manage. Note the order — dependents are destroyed before the things they depend on:
 
 ```cpp
 void VKRenderer::cleanupSwapchain() {
     vkDestroyImageView(device, depthImageView, nullptr);
     vmaDestroyImage(vmaAllocator, depthImage, depthImageAllocation);
-
-    for (auto framebuffer : swapchainFramebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
 
     for (auto imageView : swapchainImageViews) {
         vkDestroyImageView(device, imageView, nullptr);
@@ -475,7 +419,6 @@ void VKRenderer::recreateSwapchain() {
     createSwapchain();
     createImageViews();
     createDepthResources();
-    createFramebuffers();
 }
 ```
 
@@ -521,9 +464,9 @@ void VKRenderer::endFrame() {
 
 ### Key Concepts
 
-**What needs recreation**: Swapchain, image views, depth resources, framebuffers.
+**What needs recreation**: Swapchain, image views, depth resources.
 
-**What doesn't**: Pipeline (uses dynamic viewport/scissor), command pool/buffers, sync objects, vertex/index buffers, textures, render pass.
+**What doesn't**: Pipeline (uses dynamic viewport/scissor), command pool/buffers, sync objects, vertex/index buffers, textures. With dynamic rendering there are no framebuffers or render passes to worry about during recreation.
 
 **`vkDeviceWaitIdle`**: Block until the GPU finishes all work. Required before destroying resources the GPU might still be using.
 
@@ -636,10 +579,8 @@ void VKRenderer::initialize(SDL_Window* win) {
     createSwapchain();
     createImageViews();
     createDepthResources();
-    createRenderPass();
     createDescriptorSetLayout();
     createGraphicsPipeline();
-    createFramebuffers();
     createCommandPool();
     createCommandBuffers();
     createTextureImage();
@@ -656,6 +597,8 @@ void VKRenderer::initialize(SDL_Window* win) {
     initialized = true;
 }
 ```
+
+Notice `createRenderPass()` and `createFramebuffers()` are gone — dynamic rendering eliminates both of these setup steps.
 
 ### Cleanup
 
@@ -689,7 +632,6 @@ void VKRenderer::cleanup() {
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-    vkDestroyRenderPass(device, renderPass, nullptr);
 
     vmaDestroyAllocator(vmaAllocator);
     vkDestroyDevice(device, nullptr);
@@ -703,6 +645,8 @@ void VKRenderer::cleanup() {
 }
 ```
 
+Notice `vkDestroyRenderPass` is gone — with dynamic rendering, there's no render pass object to clean up.
+
 ### Per-Frame Flow
 
 ```
@@ -712,14 +656,17 @@ beginFrame():
   3. Reset fence
   4. Update uniform buffer
   5. Reset and record command buffer
-     - Begin render pass (clear color + depth)
+     - Transition color image: UNDEFINED → COLOR_ATTACHMENT_OPTIMAL
+     - Transition depth image: UNDEFINED → DEPTH_ATTACHMENT_OPTIMAL
+     - Begin rendering (clear color + depth)
      - Set viewport/scissor
      - Bind pipeline
      - Bind vertex/index buffers
      - Bind descriptor set
      - Push constants (model MVP)
      - Draw indexed
-     - End render pass
+     - End rendering
+     - Transition color image: COLOR_ATTACHMENT_OPTIMAL → PRESENT_SRC_KHR
 
 endFrame():
   6. Submit command buffer (wait imageAvailable, signal renderFinished)

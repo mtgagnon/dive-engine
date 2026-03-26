@@ -20,7 +20,8 @@ Continuing from [Part 3: 3D Rendering](VULKAN_TUTORIAL_PART3.md). This final par
 11. [Lighting](#11-lighting)
 12. [Shadow Mapping](#12-shadow-mapping)
 13. [3D Physics](#13-3d-physics)
-14. [Recommended Learning Path](#14-recommended-learning-path)
+14. [Timeline Semaphores](#14-timeline-semaphores)
+15. [Recommended Learning Path](#15-recommended-learning-path)
 
 ---
 
@@ -468,7 +469,7 @@ for (uint32_t i = 1; i < mipLevels; i++) {
 - Query `VkPhysicalDeviceProperties::limits::framebufferColorSampleCounts` to find supported sample counts
 - Create a multisampled color image as an offscreen render target
 - Update depth image to match the sample count
-- Add a resolve attachment to the render pass that converts multisampled → single-sample for presentation
+- With dynamic rendering, set `VkRenderingAttachmentInfo::resolveMode` and `resolveImageView` on the color attachment to resolve multisampled → single-sample for presentation (no separate resolve attachment in a render pass needed)
 - Update `VkPipelineMultisampleStateCreateInfo::rasterizationSamples`
 
 **When to add**: After core rendering is solid and you want to polish visual quality. MSAA is a "drop-in" quality improvement that doesn't require shader changes.
@@ -519,8 +520,8 @@ vec3 result = (ambient + diffuse + specular) * objectColor;
 
 **What**: Render the scene from the light's perspective into a depth-only texture (shadow map). In the main render pass, compare each fragment's depth from the light's view to determine if it's in shadow.
 
-**Key concept**: Two render passes per frame:
-1. Shadow pass: Render to a depth-only framebuffer using the light's view/projection
+**Key concept**: Two rendering passes per frame (using `vkCmdBeginRendering`/`vkCmdEndRendering`):
+1. Shadow pass: Render to a depth-only attachment using the light's view/projection
 2. Main pass: Sample the shadow map in the fragment shader
 
 **When to add**: After basic lighting works. Shadows are the next biggest visual improvement after lighting.
@@ -542,12 +543,64 @@ vec3 result = (ambient + diffuse + specular) * objectColor;
 
 ---
 
-## 14. Recommended Learning Path
+## 14. Timeline Semaphores
+
+**What**: Timeline semaphores (`VK_SEMAPHORE_TYPE_TIMELINE`) are an advanced synchronization primitive that replaces binary semaphores with a monotonically increasing 64-bit counter. Instead of "signaled or not," a timeline semaphore has a current value, and operations can wait until it reaches a specific value or signal it to a new value.
+
+**Why**: Binary semaphores (used in this tutorial) work well for straightforward "frame N rendering waits for frame N's image acquisition" patterns. Timeline semaphores shine when you need:
+- **Async compute**: A compute queue signals timeline value 5, and a graphics queue waits for value 5 before using the computed results
+- **Multi-queue coordination**: Multiple queues can wait on and signal the same timeline semaphore at different values
+- **CPU-GPU synchronization**: The CPU can wait on or signal timeline semaphores directly via `vkWaitSemaphores`/`vkSignalSemaphore`, replacing some fence use cases
+
+**Key concept**: Timeline semaphores are core in Vulkan 1.2+ (and already available via your Vulkan 1.3 setup). The main API differences from binary semaphores:
+
+```cpp
+// Creation — specify timeline type and initial value
+VkSemaphoreTypeCreateInfo timelineInfo{};
+timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+timelineInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+timelineInfo.initialValue = 0;
+
+VkSemaphoreCreateInfo semaphoreInfo{};
+semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+semaphoreInfo.pNext = &timelineInfo;
+
+vkCreateSemaphore(device, &semaphoreInfo, nullptr, &timelineSemaphore);
+```
+
+```cpp
+// Submission — specify wait/signal values via VkTimelineSemaphoreSubmitInfo
+VkTimelineSemaphoreSubmitInfo timelineSubmit{};
+timelineSubmit.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+timelineSubmit.waitSemaphoreValueCount = 1;
+timelineSubmit.pWaitSemaphoreValues = &waitValue;
+timelineSubmit.signalSemaphoreValueCount = 1;
+timelineSubmit.pSignalSemaphoreValues = &signalValue;
+
+submitInfo.pNext = &timelineSubmit;
+```
+
+```cpp
+// CPU wait — block until the semaphore reaches a specific value
+VkSemaphoreWaitInfo waitInfo{};
+waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+waitInfo.semaphoreCount = 1;
+waitInfo.pSemaphores = &timelineSemaphore;
+waitInfo.pValues = &targetValue;
+
+vkWaitSemaphores(device, &waitInfo, UINT64_MAX);
+```
+
+**When to add**: After you've implemented compute shaders and need to coordinate work across graphics and compute queues. For simple single-queue rendering, binary semaphores are sufficient and simpler to reason about.
+
+---
+
+## 15. Recommended Learning Path
 
 Follow this progression. Each step builds on the previous one:
 
 ```
-Part 1: Triangle on screen
+Part 1: Triangle on screen (dynamic rendering, Vulkan 1.3)
     ↓
 Part 2: Vertex buffers + textures
     ↓
@@ -564,6 +617,8 @@ Model loading from various formats (glTF)
 Mipmaps + MSAA (visual polish)
     ↓
 Compute shaders (particles, post-processing)
+    ↓
+Timeline semaphores (async compute coordination)
     ↓
 3D physics (Jolt/Bullet)
     ↓
@@ -623,28 +678,28 @@ vkDestroyThing(device, thing, nullptr);
 2.  setupDebugMessenger()
 3.  createSurface()
 4.  pickPhysicalDevice()
-5.  createLogicalDevice()
+5.  createLogicalDevice()          // Enables Vulkan 1.3 features (dynamicRendering, synchronization2)
 6.  createVmaAllocator()
 7.  createSwapchain()
 8.  createImageViews()
 9.  createDepthResources()
-10. createRenderPass()
-11. createDescriptorSetLayout()
-12. createGraphicsPipeline()
-13. createFramebuffers()
-14. createCommandPool()
-15. createCommandBuffers()
-16. createTextureImage()
-17. createTextureImageView()
-18. createTextureSampler()
-19. loadModel()
-20. createVertexBuffer()
-21. createIndexBuffer()
-22. createUniformBuffers()
-23. createDescriptorPool()
-24. createDescriptorSets()
-25. createSyncObjects()
+10. createDescriptorSetLayout()
+11. createGraphicsPipeline()       // Uses VkPipelineRenderingCreateInfo instead of render pass
+12. createCommandPool()
+13. createCommandBuffers()
+14. createTextureImage()
+15. createTextureImageView()
+16. createTextureSampler()
+17. loadModel()
+18. createVertexBuffer()
+19. createIndexBuffer()
+20. createUniformBuffers()
+21. createDescriptorPool()
+22. createDescriptorSets()
+23. createSyncObjects()
 ```
+
+No `createRenderPass()` or `createFramebuffers()` — dynamic rendering (Vulkan 1.3) eliminates both.
 
 **Per Frame**:
 
@@ -655,18 +710,21 @@ vkDestroyThing(device, thing, nullptr);
 4.  Update uniform buffer
 5.  Reset command buffer
 6.  Begin command buffer
-7.  Begin render pass
-8.  Set viewport/scissor
-9.  Bind pipeline
-10. Bind vertex buffer
-11. Bind index buffer
-12. Bind descriptor sets
-13. Push constants (per-object MVP)
-14. Draw indexed
-15. End render pass
-16. End command buffer
-17. Submit to queue
-18. Present
+7.  Transition color image: UNDEFINED → COLOR_ATTACHMENT_OPTIMAL
+8.  Transition depth image: UNDEFINED → DEPTH_ATTACHMENT_OPTIMAL
+9.  Begin rendering (vkCmdBeginRendering with color + depth attachments)
+10. Set viewport/scissor
+11. Bind pipeline
+12. Bind vertex buffer
+13. Bind index buffer
+14. Bind descriptor sets
+15. Push constants (per-object MVP)
+16. Draw indexed
+17. End rendering (vkCmdEndRendering)
+18. Transition color image: COLOR_ATTACHMENT_OPTIMAL → PRESENT_SRC_KHR
+19. End command buffer
+20. Submit to queue
+21. Present
 ```
 
 **Cleanup** (reverse of init): Wait for device idle, then destroy everything in reverse order.
