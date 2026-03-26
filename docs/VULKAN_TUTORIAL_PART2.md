@@ -1198,10 +1198,8 @@ createLogicalDevice();
 createVmaAllocator();
 createSwapchain();
 createImageViews();
-createRenderPass();
 createDescriptorSetLayout();
 createGraphicsPipeline();
-createFramebuffers();
 createCommandPool();
 createCommandBuffers();
 createTextureImage();
@@ -1239,14 +1237,9 @@ vmaDestroyImage(vmaAllocator, textureImage, textureImageAllocation);
 
 vkDestroyCommandPool(device, commandPool, nullptr);
 
-for (auto framebuffer : swapchainFramebuffers) {
-    vkDestroyFramebuffer(device, framebuffer, nullptr);
-}
-
 vkDestroyPipeline(device, graphicsPipeline, nullptr);
 vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-vkDestroyRenderPass(device, renderPass, nullptr);
 
 for (auto imageView : swapchainImageViews) {
     vkDestroyImageView(device, imageView, nullptr);
