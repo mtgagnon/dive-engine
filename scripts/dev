@@ -13,7 +13,7 @@
 _build() {
   case "$1" in
     -l) eval "$BUILD_LINUX_D" && cmake --build $PROJECT_DIR/builds/build-debug -- -s && eval "$LINK_COMPILE_COMMANDS" ;;
-    -m) eval "$BUILD_MAC" && cmake --build $PROJECT_DIR/builds/build-xcode -- -s ;;
+    -m) eval "$BUILD_MAC_D" && cmake --build $PROJECT_DIR/builds/build-xcode -- -s ;;
     *)  echo "Usage: dev build -l | -m" ;;
   esac
 }

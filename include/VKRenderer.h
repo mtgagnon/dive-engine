@@ -51,6 +51,19 @@ private:
         }
     };
 
+    /**
+     * @brief Swapchain support details struct.
+     * @struct SwapchainSupportDetails
+     * @field capabilities The surface capabilities.
+     * @field formats The available surface formats.
+     * @field presentModes The available present modes.
+     */
+    struct SwapchainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats = {};
+        std::vector<VkPresentModeKHR> presentModes = {};
+    };
+
     // ------- Functions -------
 
     /**
@@ -65,6 +78,22 @@ private:
      * @details No-op in release builds where validation layers are disabled.
      */
     void setupDebugMessenger();
+
+    /**
+     * @brief Loads and calls vkCreateDebugUtilsMessengerEXT at runtime via vkGetInstanceProcAddr.
+     * @details This function is not linked directly — it must be looked up through the instance
+     * because it is part of an extension rather than core Vulkan.
+     * @param pCreateInfo Messenger configuration (severity, type filters, callback pointer).
+     * @return VK_SUCCESS on success, VK_ERROR_EXTENSION_NOT_PRESENT if the extension is unavailable.
+     */
+     VkResult createDebugMessenger(const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo);
+
+     /**
+      * @brief Loads and calls vkDestroyDebugUtilsMessengerEXT at runtime via vkGetInstanceProcAddr.
+      * @details Mirror of createDebugMessenger — the destroy function must also be loaded
+      * dynamically for the same reason. Does nothing if the function pointer is unavailable.
+      */
+     void destroyDebugMessenger();
 
     /**
      * @brief Checks whether all requested validation layers are available on this machine.
@@ -102,6 +131,74 @@ private:
      */
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
+    /**
+     * @brief Creates the logical device.
+     * @details Creates the logical device and queues for the physical device.
+     */
+    void createLogicalDevice();
+
+    /**
+     * @brief Destroys the logical device.
+     * @details Destroys the logical device and queues for the physical device.
+     */
+    void destroyLogicalDevice();
+
+    /**
+     * @brief Creates the surface.
+     * @details Creates the surface for the window.
+     */
+    void createSurface();
+
+    /**
+     * @brief Destroys the surface.
+     * @details Destroys the surface for the window.
+     */
+    void destroySurface();
+
+    /**
+     * @brief Queries the swapchain support details.
+     * @details Queries the swapchain support details for the physical device.
+     * @param device The physical device to query the swapchain support details for.
+     * @return The swapchain support details.
+     */
+    SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device);
+
+    /**
+     * @brief Chooses the swapchain surface format.
+     * @details Chooses the swapchain surface format for the physical device.
+     * @param formats The available formats.
+     * @return The chosen format.
+     */
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
+
+    /**
+     * @brief Chooses the swapchain present mode.
+     * @details Chooses the swapchain present mode for the physical device.
+     * @param modes The available present modes.
+     * @return The chosen present mode.
+     */
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& modes);
+
+    /**
+     * @brief Chooses the swapchain extent.
+     * @details Chooses the swapchain extent for the physical device.
+     * @param capabilities The available capabilities.
+     * @return The chosen extent.
+     */
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+
+    /**
+     * @brief Creates the swapchain.
+     * @details Creates the swapchain for the physical device.
+     */
+    void createSwapchain();
+
+    /**
+     * @brief Destroys the swapchain.
+     * @details Destroys the swapchain for the physical device.
+     */
+    void destroySwapchain();
+
     // ------- Static Functions -------
 
     /**
@@ -129,41 +226,24 @@ private:
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
         void* pUserData);
 
-    /**
-     * @brief Loads and calls vkCreateDebugUtilsMessengerEXT at runtime via vkGetInstanceProcAddr.
-     * @details This function is not linked directly — it must be looked up through the instance
-     * because it is part of an extension rather than core Vulkan.
-     * @param instance The Vulkan instance to look up the function from.
-     * @param pCreateInfo Messenger configuration (severity, type filters, callback pointer).
-     * @param pAllocator Custom allocator, or nullptr to use the default.
-     * @param pDebugMessenger Output handle for the created messenger.
-     * @return VK_SUCCESS on success, VK_ERROR_EXTENSION_NOT_PRESENT if the extension is unavailable.
-     */
-    static VkResult createDebugMessenger(
-        VkInstance instance,
-        const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-        const VkAllocationCallbacks* pAllocator,
-        VkDebugUtilsMessengerEXT* pDebugMessenger);
-
-    /**
-     * @brief Loads and calls vkDestroyDebugUtilsMessengerEXT at runtime via vkGetInstanceProcAddr.
-     * @details Mirror of createDebugMessenger — the destroy function must also be loaded
-     * dynamically for the same reason. Does nothing if the function pointer is unavailable.
-     * @param instance The Vulkan instance the messenger belongs to.
-     * @param debugMessenger The messenger handle to destroy.
-     * @param pAllocator Custom allocator, or nullptr to use the default.
-     */
-    static void destroyDebugMessenger(
-        VkInstance instance,
-        VkDebugUtilsMessengerEXT debugMessenger,
-        const VkAllocationCallbacks* pAllocator);
-
     // ------- Variables -------
 
-    VkInstance instance = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
-    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;  // TODO RAII this as a struct/class member
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // TODO RAII this as a struct/class member
+    // TODO RAII these as a struct/class member
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkDevice logicalDevice = VK_NULL_HANDLE;
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+    VkQueue presentQueue = VK_NULL_HANDLE;
+
+    // swapchain
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    std::vector<VkImage> swapchainImages;
+    VkFormat swapchainImageFormat;
+
+
+VkExtent2D swapchainExtent;
 
     SDL_Window* window = nullptr;
     uint32_t currentFrame = 0;

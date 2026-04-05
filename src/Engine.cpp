@@ -151,4 +151,3 @@ void Engine::createWindow(const string& game_title) {
         exit(0);
     }
 }
-

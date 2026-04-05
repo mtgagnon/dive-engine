@@ -18,11 +18,15 @@ using std::cout, std::cin, std::string;
 
 // inline static SDL_Renderer* renderer = nullptr;
 
-SDL_Window* createWindow(const std::string& game_title, int x_resolution, int y_resolution) {
+SDL_Window* createWindow(const std::string& game_title, int x_resolution, int y_resolution, bool vulkan) {
     if(SDL_Init(SDL_INIT_VIDEO) != 0) {
         cout << "SDL could not initialize! SDL_ERROR: " << SDL_GetError() << std::endl;
         exit(0);
     }
+
+
+    uint32 flags = SDL_WINDOW_SHOWN;
+    flags |= (vulkan) ? SDL_WINDOW_VULKAN : 0;
 
     SDL_Window* window = SDL_CreateWindow(
         game_title.c_str(),
@@ -30,7 +34,7 @@ SDL_Window* createWindow(const std::string& game_title, int x_resolution, int y_
         SDL_WINDOWPOS_CENTERED,
         x_resolution,
         y_resolution,
-        SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN  // Change to SDL_WINDOW_VULKAN when using VKRenderer
+        flags
     );
 
     if(!window) {
@@ -48,7 +52,7 @@ int main(int argc, char* argv[]){
 
     // testing and sandboxing with VKRenderer
 
-    SDL_Window* window = createWindow("Vulkan Test", 2*640, 2*360);
+    SDL_Window* window = createWindow("Vulkan Test", 2*640, 2*360, true);
     VKRenderer renderer(window);
     bool running = true;
 
@@ -56,7 +60,7 @@ int main(int argc, char* argv[]){
         while (running) {
             renderer.beginFrame();
             // calls to the renderer happen here
-            renderer.endFrame();
+
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 if (event.type == SDL_QUIT) {
@@ -67,6 +71,8 @@ int main(int argc, char* argv[]){
                     }
                 }
             }
+
+            renderer.endFrame();
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
