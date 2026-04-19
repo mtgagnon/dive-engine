@@ -19,12 +19,13 @@ else()
 endif()
 
 # Define the source files
-# Including Lua and other source files
 file(GLOB_RECURSE MY_SOURCES "src/*.cpp")
-
 file(GLOB_RECURSE MY_HEADERS "include/*.h" "include/*.hpp")
 
-# Add executable
+# Exclude test mains from the main engine build
+list(FILTER MY_SOURCES EXCLUDE REGEX ".*_test_main\\.cpp$")
+
+# Add main engine executable
 add_executable("${PROJECT_NAME}" ${MY_SOURCES} ${MY_HEADERS})
 
 # set C++ version for target
@@ -42,6 +43,13 @@ target_include_directories("${PROJECT_NAME}" PRIVATE
 # )
 
 include("cmake/externalLibs.cmake")
+
+# Add Vulkan support
+find_package(Vulkan REQUIRED)
+target_link_libraries("${PROJECT_NAME}" PRIVATE Vulkan::Vulkan)
+
+# VMA (Vulkan Memory Allocator) - header-only
+target_include_directories("${PROJECT_NAME}" PRIVATE "${PROJECT_SOURCE_DIR}/external/VulkanMemoryAllocator/include")
 
 # need to still include the glew library headers I guess
 target_include_directories("${PROJECT_NAME}" PRIVATE "${PROJECT_SOURCE_DIR}/external/glew/include")

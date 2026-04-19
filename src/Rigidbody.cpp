@@ -296,6 +296,7 @@ void RigidBody::SetAngularVelocity(float degrees_clockwise) {
 void RigidBody::SetGravityScale(float scale) {
     if(!body) {
         gravity_scale = scale;
+        return;
     }
 
     body->SetGravityScale(scale);

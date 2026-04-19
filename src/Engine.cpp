@@ -51,7 +51,9 @@ void Engine::initialize() {
         game_title = config["game_title"].GetString();
     }
 
-    SDLRenderer::initialize(game_title);
+    createWindow(game_title);
+
+    SDLRenderer::initialize(window);
     AudioManager::initialize();
     Input::initialize();
 
@@ -110,6 +112,42 @@ void Engine::input() {
                 Input::ProcessEvent(event);
         }
     }
-
 }
 
+// Creates a window and sets the window pointer
+// Allows for future renderer changes without changing the engine
+// also abstracts the window creation from the renderer
+void Engine::createWindow(const string& game_title) {
+    int x_resolution = 640;
+    int y_resolution = 360;
+
+    if(exists("resources/rendering.config")) {
+        rapidjson::Document renderConfig;
+        EngineUtils::ReadJsonFile("resources/rendering.config", renderConfig);
+        if(renderConfig.HasMember("x_resolution")) {
+            x_resolution = renderConfig["x_resolution"].GetInt();
+        }
+        if(renderConfig.HasMember("y_resolution")) {
+            y_resolution = renderConfig["y_resolution"].GetInt();
+        }
+    }
+
+    if(SDL_Init(SDL_INIT_VIDEO) != 0) {
+        cout << "SDL could not initialize! SDL_ERROR: " << SDL_GetError() << endl;
+        exit(0);
+    }
+
+    window = SDL_CreateWindow(
+        game_title.c_str(),
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        x_resolution,
+        y_resolution,
+        SDL_WINDOW_SHOWN  // Change to SDL_WINDOW_VULKAN when using VKRenderer
+    );
+
+    if(!window) {
+        cout << "Window could not be created! SDL Error: " << SDL_GetError() << endl;
+        exit(0);
+    }
+}

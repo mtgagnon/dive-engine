@@ -12,7 +12,7 @@
 
 
 void EventBus::Publish(std::string event_type, luabridge::LuaRef event_object) {
-    
+
     auto list_it = event_subs.find(event_type);
         if (list_it != event_subs.end()) {
             auto& sub_list = list_it->second;
@@ -33,16 +33,16 @@ void EventBus::Subscribe(std::string event_type, luabridge::LuaRef component, lu
     event_subs_to_add[event_type].emplace_back(component, function); // add to the sub list
 }
 
-void EventBus::Unsubscribe(std::string event_type, luabridge::LuaRef component, luabridge::LuaRef function) { 
+void EventBus::Unsubscribe(std::string event_type, luabridge::LuaRef component, luabridge::LuaRef function) {
     auto list_it = event_subs.find(event_type);
-    
+
     if(list_it != event_subs.end()) {
         std::list<Subscription>& sub_list = list_it->second;
 
         // go through subs, to remove component, remove abandoned ones as well
         for(auto it = sub_list.begin(); it != sub_list.end(); it++) {
             auto sub = *it;
-            if(!sub.component.isTable() || sub.component.isNil() || (sub.component == component && sub.callback == function)) {
+            if(!sub.component.isTable() || sub.component.isNil() || (sub.component.rawequal(component) && sub.callback.rawequal(function))) {
                 event_subs_to_unsub[event_type].push_back(it);
             }
         }
@@ -55,7 +55,7 @@ void EventBus::PushChangesToSubList() {
             event_subs[event_pair.first].push_back(sub);
         }
     }
-    
+
     for(auto unsub_list : event_subs_to_unsub) {
         std::string event_type = unsub_list.first;
         std::list<Subscription> subscription_list = event_subs[event_type];
@@ -63,7 +63,7 @@ void EventBus::PushChangesToSubList() {
             subscription_list.erase(sub_to_remove);
         }
     }
-    
+
     event_subs_to_add.clear();
     event_subs_to_unsub.clear();
 }

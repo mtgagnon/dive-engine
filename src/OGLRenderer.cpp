@@ -152,11 +152,11 @@ static uint CompileShader(uint type, const std::string &source) {
     glShaderSource(id, 1, &src, nullptr);
     glCompileShader(id);
 
-    int result;
+    int result = 0;
     glGetShaderiv(id, GL_COMPILE_STATUS, &result);
     if(result == GL_FALSE) {
-        int len;
-        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &result);
+        int len = 0;
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
         char* message = (char*)alloca(len*sizeof(char));
         glGetShaderInfoLog(id, len, &len, message);
 
