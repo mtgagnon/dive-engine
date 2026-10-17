@@ -1,6 +1,6 @@
 # Dive Engine
 
-A 2D game engine built with SDL2.
+A 2D game engine built with SDL2, working on 3D support Vulkan. **MADE WITHOUT AI GENERATED CODE.** This engine was originally created for a university project before AI. Current development is done without AI generating any engine code, it is used as a learning tool however no more than that. The point of this engine is to learn and have fun making code. This is a learning experience, AI is only to be used to learn (although creating docs is acceptable).
 
 ### Current Features
 - 2D rendering via SDL2
@@ -12,6 +12,7 @@ A 2D game engine built with SDL2.
 ### Planned
 - Vulkan rendering backend
 - 3D support
+- Real time UI editor
 
 ---
 
