@@ -31,33 +31,32 @@ enum GameState {
 class Engine {
 public:
     Engine();
-    
+
     void game_loop();
-            
+
     static inline bool newScene = false; // necessary for knowing when to restart game loop
 
 private:
-    
+
     void initialize();
-    
+
     void loadScene();
-    
-    void createWindow(const std::string &game_title);
-    
+
+    void createWindow(const std::string& game_title);
+
     void input();
-    
+
     void update();
-    
+
     void render();
-    
+
     void updateCamera();
-    
-    
-    TTF_Font* text_font = nullptr;    
+
+
+    SDL_Window* window = nullptr;
+    TTF_Font* text_font = nullptr;
     SceneDB cur_scene;
-        
     GameState state = UNLOADED;
-        
     bool isRunning = false;
 };
 

@@ -219,6 +219,3 @@ void SceneDB::dontDestroy(Actor* actor) {
         }
     }
 }
-
-
-

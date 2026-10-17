@@ -20,67 +20,41 @@
 
 using std::filesystem::exists, std::string, std::cout;
 
-void SDLRenderer::initialize(const std::string &game_title) {
-    
-    // defaul display settings
-    x_resolution = 640;
-    y_resolution = 360;
-    clear_color_r = clear_color_g =clear_color_b = 255;
-    
-    // GET WINDOW CONFIGS
+void SDLRenderer::initialize(SDL_Window* win) {
+    window = win;
+
+    // Get resolution from window
+    SDL_GetWindowSize(window, &x_resolution, &y_resolution);
+
+    // Load renderer-specific config (colors, zoom)
     if(exists("resources/rendering.config")) {
         rapidjson::Document config;
         EngineUtils::ReadJsonFile("resources/rendering.config", config);
-        if(config.HasMember("x_resolution")) {
-            x_resolution = config["x_resolution"].GetInt();
-        }
-        
-        if(config.HasMember("y_resolution")) {
-            y_resolution = config["y_resolution"].GetInt();
-        }
-        
+
         if(config.HasMember("clear_color_r")) {
             clear_color_r = config["clear_color_r"].GetInt();
         }
-        
+
         if(config.HasMember("clear_color_g")) {
             clear_color_g = config["clear_color_g"].GetInt();
         }
-        
+
         if(config.HasMember("clear_color_b")) {
             clear_color_b = config["clear_color_b"].GetInt();
         }
-        
+
         if(config.HasMember("zoom_factor")) {
             zoom_factor = config["zoom_factor"].GetFloat();
         }
-        
-        
     }
-    
-    
-    //INITIALIZE WINDOW
-    if(SDL_Init(SDL_INIT_VIDEO)) {
-        std::cout << "SDL could not initialize! SDL_ERROR: " << SDL_GetError() << std::endl;
-        exit(0);
-    }
-    
+
     if (TTF_Init() == -1) {
         std::cerr << "SDL_ttf could not initialize! SDL_ttf Error: " << TTF_GetError() << std::endl;
         exit(0);
     }
-    
-    window = SDL_CreateWindow(game_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, x_resolution, y_resolution, SDL_WINDOW_SHOWN);
 
-    if(!window) {
-        std::cerr << "Window could not be created! SDL Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return;
-    }
-    
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     SDL_RenderSetScale(renderer, zoom_factor, zoom_factor);
-
 }
 
 
@@ -91,7 +65,7 @@ void SDLRenderer::clearFrame() {
 
 void SDLRenderer::showFrame() {
     SDL_RenderPresent(renderer);
-    
+
     // aim for 60fps
     SDL_Delay();
     frame_number++;
@@ -100,13 +74,13 @@ void SDLRenderer::showFrame() {
 
 SDL_Texture* SDLRenderer::loadImage(const std::string &imgName) {
     auto it = textures.find(imgName);
-    
+
     if(it == textures.end()) {
         if(!exists("resources/images/" + imgName+".png")) {
             cout << "error: missing image " << imgName;
             exit(0);
         }
-        
+
         SDL_Texture* texture = IMG_LoadTexture(renderer, ("resources/images/"+imgName+".png").c_str());
         if (!texture) {
             std::cerr << "Failed to load texture: " << imgName << " SDL_image Error: " << IMG_GetError() << std::endl;
@@ -115,20 +89,20 @@ SDL_Texture* SDLRenderer::loadImage(const std::string &imgName) {
             textures[imgName] = texture;
         }
     }
-    
+
     return textures[imgName];
 }
 
 
 TTF_Font* SDLRenderer::loadFont(const std::string &text_name, const int size) {
     auto it = fonts.find(text_name);
-    
+
     if(it == fonts.end()) {
         if(!exists("resources/fonts/" + text_name+ ".ttf")) {
             cout << "error: missing font " << text_name;
             exit(0);
         }
-        
+
         TTF_Font* font = TTF_OpenFont(("resources/fonts/" + text_name + ".ttf").c_str(), size);
         if (!font) {
             std::cerr << "Failed to load font: " << text_name << " TTF Error: " << TTF_GetError() << std::endl;
@@ -137,35 +111,35 @@ TTF_Font* SDLRenderer::loadFont(const std::string &text_name, const int size) {
             fonts[text_name][size] = font;
         }
     }
-    
+
     return fonts[text_name][size];
 }
 
 
 void SDLRenderer::renderFrame() {
     renderAndClearImgQueue();
-    
+
     renderAndClearUIQueue();
-    
+
     while(text_requests.size()) {
         TextDrawRequest request = text_requests.front();
-        
+
         auto it = fonts.find(request.font_name);
-        
+
         TTF_Font* font = (it != fonts.end() && it->second.find(request.font_size) != it->second.end()) ? it->second[request.font_size] : loadFont(request.font_name, request.font_size);
-        
+
         renderText(font, request);
-        
+
         text_requests.pop();
     }
-    
+
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    
+
     for(auto& request : pixel_requests) {
         SDL_SetRenderDrawColor(renderer, request.r, request.g, request.b, request.a);
         SDL_RenderDrawPoint(renderer, request.x, request.y);
     }
-    
+
     pixel_requests.clear();
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
@@ -173,29 +147,29 @@ void SDLRenderer::renderFrame() {
 
 
 void SDLRenderer::renderText(TTF_Font *font, const TextDrawRequest request) {
-    
+
     SDL_Surface* textSurface = TTF_RenderText_Solid(font, request.text.c_str(), {(uint8_t)request.r, (uint8_t)request.g, (uint8_t)request.b, (uint8_t)request.a});
-    
+
     if (!textSurface) {
         std::cerr << "Unable to render text surface! SDL_ttf Error: " << TTF_GetError() << std::endl;
         exit(0);
     }
-    
+
     SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 
     if (!textTexture) {
         std::cerr << "Unable to create texture from rendered text! SDL Error: " << SDL_GetError() << std::endl;
         exit(0);
     }
-    
+
     SDL_RenderSetScale(renderer, 1, 1); // render hud unscaled
-    
+
     SDL_Rect renderQuad = {request.x, request.y, textSurface->w, textSurface->h};
     SDL_FreeSurface(textSurface); // memory leaks
 
     SDL_RenderCopy(renderer, textTexture, nullptr, &renderQuad);
     SDL_DestroyTexture(textTexture); // memory leaks
-    
+
     SDL_RenderSetScale(renderer, zoom_factor, zoom_factor); // render hud unscaled
 
 }
@@ -209,7 +183,7 @@ void SDLRenderer::renderAndClearUIQueue() {
         SDL_Texture* tex = loadImage(request.image_name);
         SDL_Rect tex_rect;
         SDL_QueryTexture(tex, NULL, NULL, &tex_rect.w, &tex_rect.h);
-        
+
         //set location on screen, regardless of cam position
         tex_rect.x = request.x;
         tex_rect.y = request.y;
@@ -238,10 +212,10 @@ void SDLRenderer::renderAndClearImgQueue()
 
     for (auto& request : img_requests)
     {
-        
+
         const int pixels_per_meter = 100;
         glm::vec2 final_rendering_position = glm::vec2(request.x, request.y) - glm::vec2(camera_pos);
-        
+
         SDL_Texture* tex = loadImage(request.image_name);
         SDL_Rect tex_rect;
         SDL_QueryTexture(tex, NULL, NULL, &tex_rect.w, &tex_rect.h);
@@ -266,7 +240,7 @@ void SDLRenderer::renderAndClearImgQueue()
         tex_rect.x = static_cast<int>(final_rendering_position.x * pixels_per_meter + cam_dimensions.x * 0.5f * (1.0f / zoom_factor) - pivot_point.x);
         tex_rect.y = static_cast<int>(final_rendering_position.y * pixels_per_meter + cam_dimensions.y * 0.5f * (1.0f / zoom_factor) - pivot_point.y);
 
-        
+
         // Apply tint / alpha to texture
         SDL_SetTextureColorMod(tex, request.r, request.g, request.b);
         SDL_SetTextureAlphaMod(tex, request.a);

@@ -1,0 +1,66 @@
+#!/usr/bin/env zsh
+# Project dev helper
+# Usage:
+#   dev build -l        configure + compile, no run (Linux debug)
+#   dev build -m        configure + compile, no run (Mac/Xcode)
+#   dev run   -l        compile + run (Linux debug)
+#   dev run   -m        compile + run (Mac/Xcode)
+#   dev run   -l --full configure + compile + run (Linux debug)
+#   dev run   -m --full configure + compile + run (Mac/Xcode)
+#   dev lint            run clang-tidy on all project source files
+#   dev lint -h         also lint project headers (include/)
+
+_build() {
+  case "$1" in
+    -l) eval "$BUILD_LINUX_D" && cmake --build $PROJECT_DIR/builds/build-debug -- -s && eval "$LINK_COMPILE_COMMANDS" ;;
+    -m) eval "$BUILD_MAC_D" && cmake --build $PROJECT_DIR/builds/build-xcode -- -s ;;
+    *)  echo "Usage: dev build -l | -m" ;;
+  esac
+}
+
+_run() {
+  local platform="$1"
+  local full="$2"
+
+  # if full is --full, build the project first
+  if [[ "$full" == "--full" ]]; then
+    _build "$platform" || return 1
+  fi
+  case "$platform" in
+    -l)
+      $PROJECT_DIR/builds/build-debug/dive_engine
+      ;;
+    -m)
+      $PROJECT_DIR/builds/build-xcode/dive_engine
+      ;;
+    *)
+      echo "Usage: dev run -l | -m [--full]" ;;
+  esac
+}
+
+_lint() {
+  local header_filter=""
+  if [[ "$1" == "-h" ]]; then
+    header_filter="--header-filter=.*dive-engine/include/.*"
+    echo "Linting source files and project headers..."
+  else
+    echo "Linting source files only (use -h to also check headers)..."
+  fi
+
+  local sources=($(find $PROJECT_DIR/src -name "*.cpp"))
+  for file in $sources; do
+    echo "Linting $file..."
+    clang-tidy "$file" -p $PROJECT_DIR/builds/build-debug $header_filter
+  done
+}
+
+case "$1" in
+  build) _build "$2" ;;
+  run)   _run   "$2" "$3" ;;
+  lint)  _lint "$2" ;;
+  *)
+    echo "Usage: dev <command> [platform]"
+    echo "  Commands:  build | run | lint"
+    echo "  Platforms: -l (Linux) | -m (Mac)  (required for build/run)"
+    ;;
+esac

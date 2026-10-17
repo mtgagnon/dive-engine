@@ -1,8 +1,13 @@
 # don't keep build files
 builds/*
 
+# cursor files
+# .cursor/
+docs/tutorials
+
 # Allow specific files in the 'build' directory
 !builds/.gitkeep
+compile_commands.json
 
 **.resources
 **/frames
